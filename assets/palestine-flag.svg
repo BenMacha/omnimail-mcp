@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 300" role="img" aria-labelledby="t">
+  <title id="t">Flag of Palestine</title>
+  <rect width="600" height="100" fill="#000000"/>
+  <rect y="100" width="600" height="100" fill="#FFFFFF"/>
+  <rect y="200" width="600" height="100" fill="#007A3D"/>
+  <polygon points="0,0 200,150 0,300" fill="#CE1126"/>
+</svg>

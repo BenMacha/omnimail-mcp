@@ -8,7 +8,7 @@
 - [4. Phases](#4-phases)
 - [5. Calendrier indicatif](#5-calendrier-indicatif)
 - [6. Stockage des identifiants : la décision](#6-stockage-des-identifiants--la-décision)
-- [7. Hébergement sur benmacha.tn](#7-hébergement-sur-benmachatn)
+- [7. Hébergement](#7-hébergement)
 - [8. Tutoriels et captures d'écran](#8-tutoriels-et-captures-décran)
 - [9. Marketplaces et annuaires](#9-marketplaces-et-annuaires)
 - [10. Risques](#10-risques)
@@ -39,7 +39,7 @@ Claude Code, Claude (web/desktop), ChatGPT et Perplexity, en open source, déplo
 
 1. **Gmail OAuth en mode public** : les scopes Gmail « restreints » exigent la vérification Google + un audit de sécurité annuel (CASA), payant. → Phase 1 avec mots de passe d'application ; option « apportez votre propre client OAuth Google » ; vérification Google seulement si le service hébergé décolle.
 2. **Microsoft** : enregistrement d'une application Entra ID (gratuit), vérification d'éditeur conseillée pour éviter l'avertissement « éditeur non vérifié ».
-3. **Clients web (Claude.ai, ChatGPT)** : ils n'accèdent qu'à un serveur **distant** en HTTPS → il faut le mode hébergé (ou un tunnel personnel).
+3. **Clients web (Claude.ai, ChatGPT)** : ils n'accèdent qu'à un serveur **distant** en HTTPS → il faut le mode hébergé.
 4. **Injection de prompt** : un mail malveillant peut contenir des instructions pour l'IA. Il faut une défense dès la conception (voir [ARCHITECTURE.md](ARCHITECTURE.md#7-sécurité-face-à-linjection-de-prompt)).
 5. **Responsabilité RGPD en mode hébergé** : on manipule de la correspondance privée → AIPD (analyse d'impact) quasi certainement nécessaire avant ouverture au public.
 
@@ -57,7 +57,7 @@ Claude Code, Claude (web/desktop), ChatGPT et Perplexity, en open source, déplo
 | Interface web | Petite app (tableau de bord comptes, consentements, journal, export RGPD) | Indispensable en mode hébergé |
 | Notifications | e-mail, ntfy, webhook, Telegram | Alerte de déconnexion / échec d'archivage |
 | Conteneurs | Docker Compose, images publiées sur GHCR | |
-| Exposition | Cloudflare Tunnel (`cloudflared`) | Pas de port ouvert sur la machine |
+| Exposition | Proxy HTTPS devant le conteneur | Aucun port de l'application exposé directement |
 | Captures | Playwright (Chromium) en conteneur | Profil Compose `docs` |
 | CI | GitHub Actions : lint, tests, build image, scan (Trivy), SBOM | |
 
@@ -66,7 +66,7 @@ Claude Code, Claude (web/desktop), ChatGPT et Perplexity, en open source, déplo
 ### Phase 0 — Conception (ce dépôt, maintenant)
 README, plan, architecture, diagrammes, cadre RGPD. **Livré.**
 
-### Phase 1 — MVP local (lecture)
+### Phase 1 — MVP local (lecture) ✅ 0.1.0
 - Serveur MCP stdio en Docker.
 - Comptes IMAP : iCloud, Gmail (mot de passe d'app), Yahoo, Infomaniak, générique.
 - Coffre local chiffré (clé maître dans le trousseau du système ou en secret Docker).
@@ -75,15 +75,17 @@ README, plan, architecture, diagrammes, cadre RGPD. **Livré.**
 - Tests : serveur IMAP de test (GreenMail/Dovecot en conteneur).
 - Installation documentée pour Claude Code et Claude Desktop.
 
-### Phase 2 — Écriture et organisation
+### Phase 2 — Écriture et organisation ✅ 0.1.0 (sauf thread_get)
 - `draft_create`, `draft_reply`, `mail_send` (confirmation obligatoire, désactivable globalement).
 - `mail_move`, `mail_flag`, `mail_mark_read`, `label_apply`, `folder_create`.
 - Annotations MCP (`readOnlyHint`, `destructiveHint`) sur tous les outils.
 - Journal d'audit local.
 
-### Phase 3 — Nettoyage, spam, skills
-- `cleanup_plan` / `cleanup_apply` (simulation → validation → exécution, annulable : déplacement en corbeille, jamais suppression définitive par défaut).
-- `newsletters_list`, `unsubscribe` (en-tête `List-Unsubscribe`, RFC 8058 one-click).
+### Phase 3 — Envois récurrents, désabonnement, classement, nettoyage, spam, skills ✅ 0.1.0
+- `cleanup_plan` / `plan_apply` (simulation → validation → exécution, annulable : déplacement en corbeille, jamais suppression définitive par défaut).
+- `recurring_senders_list` : détection des envois récurrents (List-Id, expéditeur), fréquence, taux de lecture.
+- `unsubscribe_plan` : désabonnement one-click (RFC 8058) ou mailto, liens web restitués à l'utilisateur, rangement des anciens mails.
+- `classify_plan` : classement en sous-dossiers par catégorie, par expéditeur ou par règles ; `plan_undo` pour déclasser.
 - `spam_score`, `phishing_check`, Rspamd optionnel.
 - Prompts MCP / skills : tri du matin, ménage newsletters, arnaques, résumé hebdo, réponses en attente.
 - Plugin Claude Code + marketplace dans ce dépôt.
@@ -93,11 +95,11 @@ README, plan, architecture, diagrammes, cadre RGPD. **Livré.**
 - Gmail via OAuth (client fourni par l'utilisateur en local ; client du projet en hébergé).
 - Proton via conteneur Proton Mail Bridge.
 
-### Phase 5 — Mode hébergé `mcp.benmacha.tn`
+### Phase 5 — Mode hébergé (domaine de la marque)
 - Transport Streamable HTTP + serveur d'autorisation OAuth 2.1 (enregistrement dynamique de client).
 - Interface web : inscription, ajout de comptes, consentements, journal, export et suppression.
 - PostgreSQL + chiffrement par enveloppe des secrets ; Redis + worker.
-- Cloudflare Tunnel, WAF, limitation de débit.
+- Proxy HTTPS, pare-feu applicatif, limitation de débit.
 - Documents RGPD publiés : politique de confidentialité, CGU, registre, AIPD, contrat de sous-traitance.
 - Bêta sur invitation avant ouverture.
 
@@ -121,13 +123,13 @@ gantt
   axisFormat %d/%m
   section Socle
   Phase 0 Conception            :done,    p0, 2026-10-23, 1d
-  Phase 1 MVP local lecture     :         p1, 2026-10-26, 10d
-  Phase 2 Écriture & organisation :       p2, after p1, 7d
+  Phase 1 MVP local lecture     :done,    p1, 2026-10-23, 1d
+  Phase 2 Écriture & organisation :done,  p2, 2026-10-23, 1d
   section Valeur
-  Phase 3 Nettoyage, spam, skills :       p3, after p2, 10d
+  Phase 3 Nettoyage, spam, skills :done,  p3, 2026-10-23, 1d
   Phase 4 OAuth & Proton        :         p4, after p2, 10d
   section Service
-  Phase 5 Hébergé benmacha.tn   :         p5, after p4, 15d
+  Phase 5 Mode hébergé          :         p5, after p4, 15d
   Phase 6 Archivage & alertes   :         p6, after p5, 10d
   Phase 7 Tutoriels & publication :       p7, after p3, 20d
 ```
@@ -150,28 +152,25 @@ Pourquoi pas de chiffrement « zéro connaissance » côté hébergé ? Parce qu
 doivent pouvoir se connecter **sans l'utilisateur**. On l'assume, on le documente, et on propose une option
 « sans tâche de fond » où la clé est dérivée d'une phrase de passe que seul l'utilisateur connaît.
 
-## 7. Hébergement sur benmacha.tn
+## 7. Hébergement
 
 ```mermaid
 flowchart LR
-  U[Client IA] -->|HTTPS| CF[Cloudflare<br/>DNS + WAF + Access]
-  CF -->|Tunnel chiffré| CD[cloudflared]
-  subgraph Docker["Docker Compose (serveur Dali)"]
-    CD --> GW[omnimail-mcp<br/>HTTP + OAuth]
-    CD --> WEB[omnimail-web<br/>tableau de bord]
+  U[Client IA] -->|HTTPS + OAuth| RP[Proxy HTTPS]
+  subgraph Docker["Docker Compose"]
+    RP --> GW[omnimail-mcp<br/>HTTP + OAuth]
+    RP --> WEB[omnimail-web<br/>tableau de bord]
     GW --> PG[(PostgreSQL)]
     GW --> RD[(Redis)]
     WK[omnimail-worker<br/>archivage & santé] --> PG
     WK --> RD
     WK --> S3[(Stockage archives)]
     GW --> PB[proton-bridge<br/>optionnel]
-    GW --> RS[rspamd<br/>optionnel]
   end
 ```
 
-- Sous-domaines proposés : `mcp.benmacha.tn` (point d'entrée MCP), `mail.benmacha.tn` est à éviter (confusion avec un vrai webmail) → `omnimail.benmacha.tn` pour l'interface web.
-- Entrée DNS créée par Cloudflare Tunnel (CNAME vers `<id>.cfargotunnel.com`), aucun port ouvert.
-- Hébergement physique **dans l'UE** recommandé (la machine sys1 OVH convient si elle est en France).
+- Le service hébergé vivra sur le domaine de la marque (à choisir), par exemple `mcp.<domaine>` pour le point d'entrée MCP et `app.<domaine>` pour l'interface web.
+- Hébergement physique **dans l'UE** recommandé.
 - Sauvegardes PostgreSQL chiffrées, rotation 30 jours.
 
 ## 8. Tutoriels et captures d'écran
@@ -210,7 +209,7 @@ Les procédures exactes de soumission évoluent vite : elles seront revérifiée
 1. Nom du projet : `omnimail-mcp` — OK ?
 2. Licence : **AGPL-3.0** (proposée) ou MIT / Apache-2.0 ?
 3. Langage : TypeScript (proposé) ou Python ?
-4. Sous-domaines : `mcp.benmacha.tn` + `omnimail.benmacha.tn` ?
+4. Nom de domaine de la marque (voir recherche de nom) et sous-domaines du service hébergé ?
 5. Machine d'hébergement du mode hébergé (sys1 OVH ? autre ?) et qui est responsable de traitement (Dali en nom propre, une société ?).
 6. Ouverture du mode hébergé : bêta sur invitation d'abord ?
 7. Ordre des fournisseurs : iCloud + Gmail + Infomaniak en premier ?

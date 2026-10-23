@@ -1,0 +1,15 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
+  "name": "io.github.benmacha/omnimail-mcp",
+  "title": "omnimail",
+  "description": "Multi-account email MCP (IMAP/SMTP): search, unsubscribe, folder sorting, cleanup, phishing check.",
+  "repository": { "url": "https://github.com/BenMacha/omnimail-mcp", "source": "github" },
+  "version": "0.1.0",
+  "packages": [
+    {
+      "registryType": "oci",
+      "identifier": "ghcr.io/benmacha/omnimail-mcp:0.1.0",
+      "transport": { "type": "stdio" }
+    }
+  ]
+}

@@ -1,8 +1,10 @@
 node_modules/
 dist/
+coverage/
 .env
 .env.*
 !.env.example
 *.enc
 data/
+secrets/
 .DS_Store

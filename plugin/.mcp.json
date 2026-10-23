@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "omnimail": {
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "-v", "omnimail-data:/data", "ghcr.io/benmacha/omnimail-mcp:latest"]
+    }
+  }
+}

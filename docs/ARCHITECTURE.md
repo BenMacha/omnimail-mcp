@@ -13,10 +13,12 @@
   - [4.5 Préparer et envoyer une réponse](#45-préparer-et-envoyer-une-réponse)
   - [4.6 Archivage planifié et alerte de déconnexion](#46-archivage-planifié-et-alerte-de-déconnexion)
   - [4.7 Exercice des droits RGPD](#47-exercice-des-droits-rgpd)
+  - [4.8 Envois récurrents et désabonnement](#48-envois-récurrents-et-désabonnement)
+  - [4.9 Classement en sous-dossiers puis déclassement](#49-classement-en-sous-dossiers-puis-déclassement)
 - [5. États d'une connexion de compte](#5-états-dune-connexion-de-compte)
 - [6. Modèle de données (hébergé)](#6-modèle-de-données-hébergé)
 - [7. Sécurité face à l'injection de prompt](#7-sécurité-face-à-linjection-de-prompt)
-- [8. Arborescence cible du code](#8-arborescence-cible-du-code)
+- [8. Arborescence du code](#8-arborescence-du-code)
 
 ---
 
@@ -282,12 +284,12 @@ sequenceDiagram
 sequenceDiagram
   actor U as Utilisateur
   participant C as Claude.ai / ChatGPT
-  participant MCP as mcp.benmacha.tn
+  participant MCP as Instance omnimail (HTTP)
   participant AS as Serveur d'autorisation omnimail
-  participant WEB as omnimail.benmacha.tn
+  participant WEB as Interface web omnimail
   participant MS as Microsoft (exemple)
 
-  U->>C: Ajouter le connecteur https://mcp.benmacha.tn/mcp
+  U->>C: Ajouter le connecteur https://<votre-instance>/mcp
   C->>MCP: requête sans jeton
   MCP-->>C: 401 + métadonnées de ressource protégée
   C->>AS: enregistrement dynamique du client + redirection /authorize (PKCE)
@@ -352,11 +354,11 @@ sequenceDiagram
   MCP-->>IA: résumé du plan + jeton de confirmation (expire 10 min)
   IA-->>U: Voici ce que je propose… Je valide ?
   U->>IA: Oui, sauf « Le Monde »
-  IA->>MCP: cleanup_apply {planId:42, exclude:["lemonde.fr"], confirm:token}
+  IA->>MCP: plan_apply {planId, excludeSenders:["lemonde.fr"], confirmToken}
   MCP->>CS: exécute par lots
-  CS->>P: MOVE → Corbeille / Archive, désabonnement RFC 8058
+  CS->>P: MOVE → Corbeille / Archive
   CS->>AL: trace de chaque lot
-  CS-->>MCP: 1 190 déplacés, 11 désabonnements, annulable 30 j
+  CS-->>MCP: 1 190 déplacés, annulable 30 j (plan_undo)
   MCP-->>IA: rapport
   IA-->>U: Terminé. « Annuler » possible pendant 30 jours.
 ```
@@ -438,6 +440,62 @@ sequenceDiagram
   API-->>U: confirmation, purge des sauvegardes sous 30 jours
 ```
 
+### 4.8 Envois récurrents et désabonnement
+
+```mermaid
+sequenceDiagram
+  actor U as Utilisateur
+  participant IA as Assistant IA
+  participant MCP as omnimail-mcp
+  participant P as Serveurs IMAP
+  participant L as Expéditeur (lien RFC 8058)
+  participant S as SMTP du compte
+
+  U->>IA: « De quoi je peux me désabonner ? »
+  IA->>MCP: recurring_senders_list {days:90}
+  MCP->>P: SEARCH SINCE + FETCH en-têtes (List-Id, List-Unsubscribe…)
+  MCP->>MCP: regroupement par List-Id / expéditeur, taux de lecture
+  MCP-->>IA: 37 expéditeurs récurrents (one-click, mailto, lien)
+  IA-->>U: tableau + recommandations
+  U->>IA: « Les 5 premiers, et range leurs anciens mails »
+  IA->>MCP: unsubscribe_plan {senders:[…], thenMove:"folder"}
+  MCP-->>IA: plan n°7 + jeton (rien n'est fait)
+  IA-->>U: plan détaillé — je valide ?
+  U->>IA: Oui
+  IA->>MCP: plan_apply {planId, confirmToken}
+  MCP->>L: POST List-Unsubscribe=One-Click (https public uniquement)
+  MCP->>S: mail de désabonnement (méthode mailto)
+  MCP->>P: MOVE → Classement/Newsletters/<expéditeur>
+  MCP-->>IA: 4 désabonnés, 1 lien à ouvrir, 312 mails rangés
+```
+
+### 4.9 Classement en sous-dossiers puis déclassement
+
+```mermaid
+sequenceDiagram
+  actor U as Utilisateur
+  participant IA as Assistant IA
+  participant MCP as omnimail-mcp
+  participant PS as PlanStore
+  participant P as Serveur IMAP
+
+  U->>IA: « Range ma boîte iCloud par catégorie »
+  IA->>MCP: classify_plan {accounts:["moi-icloud-com"], mode:"category"}
+  MCP->>P: FETCH enveloppes + en-têtes
+  MCP->>MCP: catégorisation (Factures, Banque, Commandes…)
+  MCP->>PS: plan (références + Message-ID, pas de contenu)
+  MCP-->>IA: répartition par dossier + exemples + jeton
+  U->>IA: OK
+  IA->>MCP: plan_apply
+  MCP->>P: CREATE Classement/Factures… puis MOVE (UIDPLUS → nouveaux UID)
+  MCP->>PS: correspondances ancien UID → nouvel UID, dossiers créés
+  U->>IA: « Finalement, déclasse tout »
+  IA->>MCP: plan_undo {planId}
+  MCP->>P: MOVE retour (nouvel UID, ou recherche par Message-ID)
+  MCP->>P: DELETE des dossiers créés devenus vides
+  MCP-->>IA: 1 284 mails restaurés
+```
+
 ## 5. États d'une connexion de compte
 
 ```mermaid
@@ -500,27 +558,38 @@ Un mail est une donnée **écrite par un tiers**. Il peut contenir « Ignore tes
 
 1. Tout contenu de mail renvoyé par un outil est encadré et étiqueté comme **non fiable** (`untrusted: true`, délimiteurs explicites).
 2. Les outils d'écriture portent les annotations MCP `destructiveHint` / `openWorldHint` ; les clients demandent alors confirmation.
-3. `mail_send`, `cleanup_apply`, suppression, transfert : **jeton de confirmation** issu d'un plan préalable, à usage unique, expirant.
+3. `mail_send`, `plan_apply`, suppression, transfert : **jeton de confirmation** issu d'un plan préalable, à usage unique, expirant.
 4. Transfert automatique vers une adresse externe, création de règles de redirection : **interdits** par défaut.
 5. Liens et pièces jointes : jamais ouverts automatiquement ; `phishing_check` les analyse sans les exécuter.
 6. Limites de débit et plafonds (ex. 50 envois/jour, 5 000 déplacements/plan) configurables.
 7. Journal d'audit de toutes les actions, consultable par l'utilisateur.
 
-## 8. Arborescence cible du code
+## 8. Arborescence du code
 
 ```text
 omnimail-mcp/
-├── packages/
-│   ├── core/            # domaine, services (search, organize, cleanup, spam, archive, health)
-│   ├── providers/       # imap-smtp, gmail, graph, proton-bridge, presets
-│   ├── vault/           # LocalFileVault, EnvelopeDbVault
-│   ├── mcp-server/      # outils, prompts, ressources, transports stdio + HTTP, OAuth
-│   ├── worker/          # tâches planifiées, notifications
-│   ├── web/             # tableau de bord (mode hébergé)
-│   └── cli/             # accounts add/remove/list, doctor
-├── plugin/              # plugin Claude Code (skills, config MCP)
-├── .claude-plugin/      # marketplace.json
-├── docker/              # Dockerfiles, compose (local, hosted, docs)
-├── docs/
-└── tests/               # GreenMail/Dovecot en conteneur
+├── src/
+│   ├── cli.ts            # commandes : serve (stdio / HTTP), accounts, providers, settings
+│   ├── server.ts         # outils MCP, garde-fous (contenu non fiable)
+│   ├── prompts.ts        # prompts MCP
+│   ├── i18n.ts           # noms des dossiers créés (en, fr, ar)
+│   ├── args.ts           # arguments de la CLI
+│   ├── accounts.ts       # comptes (dans le coffre)
+│   ├── vault.ts          # coffre chiffré AES-256-GCM + scrypt
+│   ├── presets.ts        # iCloud, Gmail, Yahoo, Infomaniak, Proton Bridge…
+│   ├── imap.ts / smtp.ts # connexions
+│   ├── headers.ts        # en-têtes, List-Unsubscribe (RFC 2369 / 8058)
+│   ├── refs.ts           # références de messages compte|dossier|UID
+│   ├── audit.ts          # journal local
+│   └── services/         # read, recurring, unsubscribe, classify, plans, spam, drafts
+├── plugin/               # plugin Claude Code (MCP + skills)
+├── .claude-plugin/       # marketplace.json
+├── server.json           # fiche pour le registre MCP officiel
+├── Dockerfile, docker-compose.yml, docker/compose.test.yml
+├── tests/unit (faux serveur IMAP en mémoire), tests/integration (GreenMail)
+├── assets/               # logo, drapeau
+├── .github/              # CI, CodeQL, Dependabot, modèles d'issues et de PR
+└── docs/
 ```
+
+Prévu : `providers/graph` (Outlook), OAuth, `worker/` (archivage, surveillance), `web/` (tableau de bord du mode hébergé).

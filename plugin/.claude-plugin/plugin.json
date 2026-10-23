@@ -1,0 +1,11 @@
+{
+  "name": "omnimail",
+  "version": "0.1.0",
+  "description": "All your mail accounts in Claude Code: search, unsubscribe, sort into sub-folders, clean up, detect scams.",
+  "author": {
+    "name": "D'Ali Ben Macha"
+  },
+  "homepage": "https://github.com/BenMacha/omnimail-mcp",
+  "repository": "https://github.com/BenMacha/omnimail-mcp",
+  "license": "AGPL-3.0-only"
+}

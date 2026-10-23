@@ -21,7 +21,7 @@
 | Mode | Responsable de traitement | Rôle d'omnimail |
 |---|---|---|
 | Local / auto-hébergé | l'utilisateur lui-même (souvent exemption domestique, art. 2.2.c RGPD) | simple logiciel, aucun traitement par l'éditeur |
-| Hébergé `benmacha.tn` | l'utilisateur pour le contenu de ses mails ; l'éditeur pour la gestion des comptes du service | **sous-traitant** (art. 28) pour la boîte mail, **responsable** pour les données de compte |
+| Hébergé (instance officielle, phase 5) | l'utilisateur pour le contenu de ses mails ; l'éditeur pour la gestion des comptes du service | **sous-traitant** (art. 28) pour la boîte mail, **responsable** pour les données de compte |
 | Fournisseur IA (Anthropic, OpenAI, Perplexity) | choisi et contracté par l'utilisateur | omnimail transmet les extraits demandés par l'IA, rien de plus |
 
 ## 2. Données traitées
@@ -80,14 +80,14 @@ Voir [PLAN.md §6](PLAN.md#6-stockage-des-identifiants--la-décision). Résumé 
 
 ## 7. Droits des personnes
 
-Depuis le tableau de bord : **accès / portabilité** (export JSON), **rectification**, **effacement** (suppression du compte + révocation des jetons), **retrait du consentement**, **opposition**. Contact : adresse dédiée (à définir, ex. `privacy@benmacha.tn`). Réponse sous un mois. Droit de réclamation auprès de la CNIL rappelé.
+Depuis le tableau de bord : **accès / portabilité** (export JSON), **rectification**, **effacement** (suppression du compte + révocation des jetons), **retrait du consentement**, **opposition**. Contact : adresse dédiée (à définir avec le nom de domaine de l'éditeur). Réponse sous un mois. Droit de réclamation auprès de la CNIL rappelé.
 
 ## 8. Sous-traitants et transferts
 
 | Sous-traitant | Usage | Localisation | Point d'attention |
 |---|---|---|---|
 | Hébergeur (ex. OVH) | serveurs | France / UE | contrat art. 28 |
-| Cloudflare | DNS, tunnel, WAF | mondial | trafic chiffré transitant par Cloudflare ; clauses contractuelles types / Data Privacy Framework |
+| Fournisseur réseau / CDN éventuel | DNS, protection | selon le prestataire | à documenter au choix du prestataire |
 | Fournisseurs mail | accès aux boîtes | selon le fournisseur | choisi par l'utilisateur |
 | Fournisseur IA | traitement des extraits | selon le fournisseur | choisi par l'utilisateur, à mentionner dans la politique |
 

@@ -1,0 +1,27 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check version
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          test "$v" = "$(jq -r .version package.json)" || { echo "::error::tag $GITHUB_REF_NAME does not match package.json"; exit 1; }
+          test "$v" = "$(jq -r .version server.json)" || { echo "::error::tag $GITHUB_REF_NAME does not match server.json"; exit 1; }
+      - name: Release notes from CHANGELOG.md
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          awk -v v="$v" '$0 ~ "^## \\[" v "\\]" {on=1; next} /^## \[/ {on=0} on' CHANGELOG.md > notes.md
+          test -s notes.md || echo "See CHANGELOG.md" > notes.md
+      - run: gh release create "$GITHUB_REF_NAME" --title "omnimail $GITHUB_REF_NAME" --notes-file notes.md --verify-tag
+        env:
+          GH_TOKEN: ${{ github.token }}
