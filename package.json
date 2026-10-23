@@ -1,7 +1,7 @@
 {
   "name": "omnimail-mcp",
   "version": "0.1.0",
-  "description": "Serveur MCP multi-comptes mail (IMAP/SMTP) : recherche, tri, désabonnement, classement, nettoyage",
+  "description": "Multi-account e-mail MCP server (IMAP/SMTP): search, unsubscribe, sort into sub-folders, clean up, phishing check",
   "main": "dist/cli.js",
   "directories": {
     "doc": "docs"
@@ -9,9 +9,13 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "start": "node dist/cli.js serve",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "coverage": "vitest run tests/unit --coverage",
+    "check": "npm run lint && npm run typecheck && npm run coverage"
   },
   "repository": {
     "type": "git",
@@ -31,9 +35,11 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.6.2",
     "@types/mailparser": "^3.9.0",
     "@types/node": "^26.6.5",
     "@types/nodemailer": "^8.0.2",
+    "@vitest/coverage-v8": "^5.0.5",
     "typescript": "^7.0.2",
     "vitest": "^5.0.5"
   },
@@ -45,12 +51,17 @@
     "node": ">=20"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "keywords": [
     "mcp",
+    "model-context-protocol",
     "email",
     "imap",
+    "smtp",
+    "unsubscribe",
     "claude",
     "chatgpt"
   ]

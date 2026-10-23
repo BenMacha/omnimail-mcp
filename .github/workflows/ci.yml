@@ -4,12 +4,69 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  test:
+  lint:
+    name: Lint & types
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - name: Plugin and marketplace manifests
+        run: |
+          for f in .claude-plugin/marketplace.json plugin/.claude-plugin/plugin.json plugin/.mcp.json server.json; do
+            jq -e . "$f" > /dev/null || { echo "::error file=$f::invalid JSON"; exit 1; }
+          done
+          jq -e '.plugins[0].source == "./plugin"' .claude-plugin/marketplace.json > /dev/null
+          for s in plugin/skills/*/SKILL.md; do
+            head -1 "$s" | grep -q '^---$' || { echo "::error file=$s::missing frontmatter"; exit 1; }
+            if ! grep -q '^name: ' "$s" || ! grep -q '^description: ' "$s"; then
+              echo "::error file=$s::name/description required"; exit 1
+            fi
+          done
+          test "$(jq -r .version package.json)" = "$(jq -r .version server.json)" || { echo "::error::server.json version differs from package.json"; exit 1; }
+
+  unit:
+    name: Unit tests (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run coverage
+      - name: Coverage summary
+        if: matrix.node == 22
+        run: node scripts/coverage-summary.mjs >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: matrix.node == 22
+        with:
+          name: coverage
+          path: coverage/
+          retention-days: 14
+
+  integration:
+    name: End-to-end (GreenMail)
     runs-on: ubuntu-latest
     services:
       greenmail:
@@ -25,12 +82,30 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npm run typecheck
-      - run: npm test
-      - name: Attente de GreenMail
-        run: for i in $(seq 1 30); do nc -z 127.0.0.1 3143 && break; sleep 2; done
+      - name: Wait for GreenMail
+        run: for _ in $(seq 1 30); do nc -z 127.0.0.1 3143 && break; sleep 2; done
       - run: npm run test:integration
+
+  docker:
+    name: Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
       - run: docker build -t omnimail-mcp:ci .
+      - name: Smoke test (CLI and MCP over stdio)
+        run: |
+          docker run --rm omnimail-mcp:ci --version
+          printf '%s\n' \
+            '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"1"}}}' \
+            '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
+            '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
+            | (cat; sleep 3) | docker run -i --rm -e OMNIMAIL_MASTER_KEY=ci omnimail-mcp:ci serve > out.jsonl
+          grep -q '"name":"omnimail"' out.jsonl
+          test "$(grep -o '"name":"[a-z_]*"' out.jsonl | grep -c _)" -ge 20
+      - name: Vulnerability scan (Trivy)
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image \
+            --severity CRITICAL --ignore-unfixed --exit-code 1 --no-progress omnimail-mcp:ci

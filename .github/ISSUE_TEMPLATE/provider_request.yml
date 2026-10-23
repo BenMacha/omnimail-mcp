@@ -1,0 +1,15 @@
+name: New mail provider
+description: Ask for a provider preset or a new connection method
+labels: [provider]
+body:
+  - type: input
+    id: provider
+    attributes:
+      label: Provider
+    validations:
+      required: true
+  - type: textarea
+    id: settings
+    attributes:
+      label: Official IMAP / SMTP settings
+      description: Link to the provider's documentation.
