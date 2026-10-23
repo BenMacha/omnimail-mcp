@@ -21,11 +21,9 @@ Format : [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versionnement
 - Prompts MCP et plugin Claude Code (skills) avec marketplace dans le dépôt ; fiche `server.json` pour le registre MCP.
 - Image Docker non root, `docker-compose.yml` (profils cli, http, proton), CI GitHub Actions et publication sur GHCR.
 - Tests unitaires et tests de bout en bout contre GreenMail.
+- Phase 0 : README, plan, architecture (diagrammes de classes, séquences, états, données), fournisseurs, clients IA et marketplaces, cadre RGPD/CNIL, catalogue des outils MCP, politique de sécurité.
 
 ### Changed
 
 - README recentré sur l'installation et l'usage ; mentions d'hébergement retirées en attendant le choix du nom de domaine.
 
-### Added
-
-- Phase 0 : README, plan, architecture (diagrammes de classes, séquences, états, données), fournisseurs, clients IA et marketplaces, cadre RGPD/CNIL, catalogue des outils MCP, politique de sécurité.
