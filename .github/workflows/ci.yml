@@ -74,7 +74,7 @@ jobs:
         env:
           GREENMAIL_OPTS: >-
             -Dgreenmail.setup.test.smtp -Dgreenmail.setup.test.imap -Dgreenmail.hostname=0.0.0.0
-            -Dgreenmail.users=dali:secret@example.com -Dgreenmail.verbose=false
+            -Dgreenmail.auth.disabled -Dgreenmail.verbose=false
         ports:
           - 3143:3143
           - 3025:3025

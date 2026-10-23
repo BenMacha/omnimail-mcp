@@ -15,6 +15,9 @@ import { ImapFlow } from "imapflow";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const HOST = process.env.GREENMAIL_HOST ?? "127.0.0.1";
+// GreenMail runs with auth disabled: every run logs in as a brand-new user, so the mailbox starts empty.
+const USER = `run${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+const ADDRESS = `${USER}@example.com`;
 const work = mkdtempSync(join(tmpdir(), "omnimail-it-"));
 process.env.OMNIMAIL_DATA_DIR = work;
 process.env.OMNIMAIL_MASTER_KEY = "test-master-key-not-for-production";
@@ -26,8 +29,8 @@ const { createServer: createMcp } = await import("../../src/server.js");
 
 const account = {
   provider: "generic",
-  address: "dali@example.com",
-  username: "dali",
+  address: ADDRESS,
+  username: USER,
   secret: "secret",
   imap: { host: HOST, port: 3143, secure: false },
   smtp: { host: HOST, port: 3025, secure: false },
@@ -38,7 +41,7 @@ let unsubHits = 0;
 let client: Client;
 
 function imap() {
-  return new ImapFlow({ host: HOST, port: 3143, secure: false, auth: { user: "dali", pass: "secret" }, logger: false });
+  return new ImapFlow({ host: HOST, port: 3143, secure: false, auth: { user: USER, pass: "secret" }, logger: false });
 }
 
 const enc = (v: string) => (/^[\x20-\x7e]*$/.test(v) ? v : `=?UTF-8?B?${Buffer.from(v).toString("base64")}?=`);
@@ -46,7 +49,7 @@ const enc = (v: string) => (/^[\x20-\x7e]*$/.test(v) ? v : `=?UTF-8?B?${Buffer.f
 function mail(from: string, subject: string, extra: string[] = [], body = "Bonjour") {
   return [
     `From: ${from}`,
-    "To: dali@example.com",
+    `To: ${ADDRESS}`,
     `Subject: ${enc(subject)}`,
     `Date: ${new Date().toUTCString()}`,
     `Message-ID: <${Math.random().toString(36).slice(2)}@test>`,
@@ -106,14 +109,6 @@ beforeAll(async () => {
 
   const c = imap();
   await c.connect();
-  const lock = await c.getMailboxLock("INBOX");
-  try {
-    if (c.mailbox && c.mailbox.exists > 0) await c.messageDelete("1:*");
-  } finally {
-    lock.release();
-  }
-  const folders = (await c.list()).filter((f) => f.path !== "INBOX").sort((a, b) => b.path.length - a.path.length);
-  for (const f of folders) await c.mailboxDelete(f.path);
   const oneClick = [
     `List-Unsubscribe: <https://localhost:${port}/u/42>, <mailto:u@shop.example>`,
     "List-Unsubscribe-Post: List-Unsubscribe=One-Click",
@@ -136,7 +131,7 @@ beforeAll(async () => {
     [
       'From: "PayPal Service" <secure.paypal@gmail.com>',
       "Reply-To: support@paypa1-help.example",
-      "To: dali@example.com",
+      `To: ${ADDRESS}`,
       "Subject: Votre compte est suspendu - action requise",
       "Authentication-Results: mx.example.com; spf=softfail; dkim=none; dmarc=fail",
       `Date: ${new Date().toUTCString()}`,
