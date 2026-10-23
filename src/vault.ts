@@ -1,15 +1,15 @@
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from "node:crypto";
-import { existsSync, readFileSync, writeFileSync, renameSync, chmodSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dataPath } from "./config.js";
 
 /**
- * Coffre local chiffré (AES-256-GCM, clé dérivée par scrypt).
+ * Local encrypted vault (AES-256-GCM, key derived with scrypt).
  *
- * Origine de la clé maître, par ordre de priorité :
- *  1. variable OMNIMAIL_MASTER_KEY ;
- *  2. fichier désigné par OMNIMAIL_MASTER_KEY_FILE ;
- *  3. secret Docker /run/secrets/omnimail_master_key ;
- *  4. fichier master.key généré dans le dossier de données (avec avertissement).
+ * Master key source, by priority:
+ *  1. OMNIMAIL_MASTER_KEY environment variable;
+ *  2. file pointed to by OMNIMAIL_MASTER_KEY_FILE;
+ *  3. Docker secret /run/secrets/omnimail_master_key;
+ *  4. master.key generated in the data directory (with a warning).
  */
 interface VaultFile {
   v: 1;
@@ -29,8 +29,8 @@ function readKeyMaterial(): string {
   if (!existsSync(local)) {
     writeFileSync(local, randomBytes(32).toString("base64"), { mode: 0o600 });
     process.stderr.write(
-      `[omnimail] Clé maître générée dans ${local}. Pour plus de sécurité, déplacez-la hors du volume de données ` +
-        `(OMNIMAIL_MASTER_KEY_FILE ou secret Docker).\n`,
+      `[omnimail] Master key generated in ${local}. For better security, move it out of the data volume ` +
+        `(OMNIMAIL_MASTER_KEY_FILE or a Docker secret).\n`,
     );
   }
   return readFileSync(local, "utf8").trim();
@@ -56,7 +56,7 @@ export class Vault<T> {
       const clear = Buffer.concat([decipher.update(Buffer.from(raw.data, "base64")), decipher.final()]);
       return JSON.parse(clear.toString("utf8")) as T;
     } catch {
-      throw new Error("Impossible de déchiffrer le coffre : clé maître incorrecte ou fichier altéré.");
+      throw new Error("Cannot decrypt the vault: wrong master key or tampered file.");
     }
   }
 

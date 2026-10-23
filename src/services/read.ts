@@ -1,11 +1,11 @@
-import type { ImapFlow, FetchMessageObject, SearchObject } from "imapflow";
+import type { FetchMessageObject, ImapFlow, SearchObject } from "imapflow";
 import { simpleParser } from "mailparser";
 import type { Account } from "../accounts.js";
+import { extractAddress, header, parseHeaders, parseListUnsubscribe, type UnsubscribeInfo } from "../headers.js";
 import { errorMessage, findSpecialUse, inMailbox, isGmail, withImap } from "../imap.js";
 import { encodeRef, type MessageRef } from "../refs.js";
-import { extractAddress, header, parseHeaders, parseListUnsubscribe, type UnsubscribeInfo } from "../headers.js";
 
-/** En-têtes récupérés pour chaque résumé de message. */
+/** Headers fetched for each message summary. */
 export const SUMMARY_HEADERS = [
   "list-unsubscribe",
   "list-unsubscribe-post",
@@ -67,12 +67,7 @@ export function toSummary(account: Account, folder: string, msg: FetchMessageObj
   };
 }
 
-export async function fetchSummaries(
-  client: ImapFlow,
-  account: Account,
-  folder: string,
-  uids: number[],
-): Promise<MessageSummary[]> {
+export async function fetchSummaries(client: ImapFlow, account: Account, folder: string, uids: number[]): Promise<MessageSummary[]> {
   if (uids.length === 0) return [];
   const out: MessageSummary[] = [];
   for await (const msg of client.fetch(
@@ -111,9 +106,9 @@ export interface SearchCriteria {
   unread?: boolean;
   flagged?: boolean;
   largerThanKb?: number;
-  /** "inbox" (défaut), "all" (tous les dossiers sauf corbeille et spam) ou un chemin de dossier. */
+  /** "inbox" (default), "all" (every folder except trash, junk and drafts) or a folder path. */
   folder?: string;
-  /** Requête Gmail native (comptes Gmail uniquement), ex. "has:attachment older_than:1y". */
+  /** Native Gmail query (Gmail accounts only), e.g. "has:attachment older_than:1y". */
   gmailQuery?: string;
   limit?: number;
 }
@@ -220,7 +215,7 @@ export async function fetchSource(account: Account, ref: MessageRef): Promise<Bu
   return withImap(account, (client) =>
     inMailbox(client, ref.folder, async () => {
       const msg = await client.fetchOne(String(ref.uid), { source: true }, { uid: true });
-      if (!msg || !msg.source) throw new Error("Message introuvable (déplacé ou supprimé ?).");
+      if (!msg || !msg.source) throw new Error("Message not found (moved or deleted?).");
       return msg.source;
     }),
   );
@@ -228,7 +223,7 @@ export async function fetchSource(account: Account, ref: MessageRef): Promise<Bu
 
 export async function getMessage(account: Account, ref: MessageRef, maxChars = 20_000): Promise<FullMessage> {
   const parsed = await simpleParser(await fetchSource(account, ref));
-  const body = parsed.text ?? (parsed.html ? htmlToText(parsed.html) : "");
+  const body = (parsed.text ?? (parsed.html ? htmlToText(parsed.html) : "")).replace(/\u00a0/g, " ");
   const addr = (v: unknown) => (v ? (Array.isArray(v) ? v.map((x) => x.text).join(", ") : (v as { text: string }).text) : undefined);
   return {
     ref: encodeRef(ref),
@@ -253,7 +248,7 @@ export async function getMessage(account: Account, ref: MessageRef, maxChars = 2
 export async function getAttachment(account: Account, ref: MessageRef, index: number) {
   const parsed = await simpleParser(await fetchSource(account, ref));
   const att = parsed.attachments[index];
-  if (!att) throw new Error(`Pièce jointe ${index} introuvable.`);
+  if (!att) throw new Error(`Attachment ${index} not found.`);
   return att;
 }
 
@@ -287,7 +282,7 @@ export async function accountHealth(account: Account): Promise<AccountHealth> {
   }
 }
 
-/** Résumés des messages d'un dossier correspondant à une recherche, pour plusieurs comptes. */
+/** Summaries of the messages in a folder matching a query, across accounts. */
 export async function collectSummaries(
   accounts: Account[],
   folder: string,

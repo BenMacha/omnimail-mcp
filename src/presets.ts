@@ -1,7 +1,7 @@
 export interface ServerEndpoint {
   host: string;
   port: number;
-  /** true = TLS direct, false = STARTTLS. */
+  /** true = implicit TLS, false = STARTTLS. */
   secure: boolean;
 }
 
@@ -10,13 +10,13 @@ export interface Preset {
   label: string;
   imap: ServerEndpoint;
   smtp: ServerEndpoint;
-  /** Page où créer un mot de passe d'application. */
+  /** Page where the user creates an app password. */
   appPasswordUrl?: string;
-  /** Certificat auto-signé accepté (Proton Mail Bridge sur le réseau Docker interne). */
+  /** Accept a self-signed certificate (Proton Mail Bridge on the internal Docker network). */
   tlsInsecure?: boolean;
-  /** Le fournisseur refuse les mots de passe : OAuth requis (pas encore pris en charge). */
+  /** The provider refuses passwords: OAuth required (not supported yet). */
   oauthOnly?: boolean;
-  /** Gmail : recherche X-GM-RAW et libellés. */
+  /** Gmail: X-GM-RAW search and labels. */
   gmail?: boolean;
   note?: string;
 }
@@ -30,7 +30,7 @@ export const PRESETS: Record<string, Preset> = {
     imap: { host: "imap.mail.me.com", port: 993, secure: true },
     smtp: { host: "smtp.mail.me.com", port: 587, secure: false },
     appPasswordUrl: "https://account.apple.com/account/manage",
-    note: "Identifiants de connexion et sécurité → Mots de passe pour app.",
+    note: "Sign-In and Security → App-Specific Passwords.",
   },
   gmail: {
     id: "gmail",
@@ -39,7 +39,7 @@ export const PRESETS: Record<string, Preset> = {
     smtp: { host: "smtp.gmail.com", port: 465, secure: true },
     appPasswordUrl: "https://myaccount.google.com/apppasswords",
     gmail: true,
-    note: "La validation en deux étapes doit être activée.",
+    note: "2-Step Verification must be enabled.",
   },
   yahoo: {
     id: "yahoo",
@@ -61,7 +61,7 @@ export const PRESETS: Record<string, Preset> = {
     imap: { host: "mail.infomaniak.com", port: 993, secure: true },
     smtp: { host: "mail.infomaniak.com", port: 465, secure: true },
     appPasswordUrl: "https://manager.infomaniak.com",
-    note: "Mot de passe d'application obligatoire si la double authentification est active.",
+    note: "An app password is required when two-factor authentication is on.",
   },
   proton: {
     id: "proton",
@@ -69,7 +69,7 @@ export const PRESETS: Record<string, Preset> = {
     imap: { host: protonHost, port: 143, secure: false },
     smtp: { host: protonHost, port: 25, secure: false },
     tlsInsecure: true,
-    note: "Lancer le service proton-bridge (profil Docker « proton ») et utiliser le mot de passe affiché par le Bridge.",
+    note: 'Start the proton-bridge service (Docker profile "proton") and use the password shown by the Bridge.',
   },
   fastmail: {
     id: "fastmail",
@@ -80,7 +80,7 @@ export const PRESETS: Record<string, Preset> = {
   },
   zoho: {
     id: "zoho",
-    label: "Zoho Mail (UE)",
+    label: "Zoho Mail (EU)",
     imap: { host: "imap.zoho.eu", port: 993, secure: true },
     smtp: { host: "smtp.zoho.eu", port: 465, secure: true },
   },
@@ -102,7 +102,7 @@ export const PRESETS: Record<string, Preset> = {
     imap: { host: "outlook.office365.com", port: 993, secure: true },
     smtp: { host: "smtp.office365.com", port: 587, secure: false },
     oauthOnly: true,
-    note: "Microsoft n'accepte plus les mots de passe en IMAP : connexion OAuth prévue en phase 4.",
+    note: "Microsoft no longer accepts passwords over IMAP: OAuth sign-in is planned for phase 4.",
   },
 };
 
@@ -116,7 +116,6 @@ export function presetForAddress(address: string): Preset | undefined {
   if (["proton.me", "protonmail.com", "pm.me"].includes(domain)) return PRESETS.proton;
   if (domain === "fastmail.com") return PRESETS.fastmail;
   if (domain.startsWith("gmx.")) return PRESETS.gmx;
-  if (["outlook.com", "hotmail.com", "live.com", "msn.com", "outlook.fr", "hotmail.fr", "live.fr"].includes(domain))
-    return PRESETS.outlook;
+  if (["outlook.com", "hotmail.com", "live.com", "msn.com", "outlook.fr", "hotmail.fr", "live.fr"].includes(domain)) return PRESETS.outlook;
   return undefined;
 }

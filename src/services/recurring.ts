@@ -1,44 +1,46 @@
 import type { Account } from "../accounts.js";
-import { errorMessage, inMailbox, withImap } from "../imap.js";
 import type { UnsubscribeInfo } from "../headers.js";
+import { errorMessage, inMailbox, withImap } from "../imap.js";
 import { fetchSummaries, type MessageSummary } from "./read.js";
 
-/** Un expéditeur qui écrit régulièrement (newsletter, notifications, promotions…). */
+export type UnsubscribeMethod = "one-click" | "mailto" | "link" | "none";
+
+/** A sender who writes regularly (newsletters, notifications, promotions…). */
 export interface RecurringSender {
-  /** Clé stable : List-Id si présent, sinon adresse de l'expéditeur. */
+  /** Stable key: List-Id when present, otherwise the sender address. */
   key: string;
   name?: string;
   address?: string;
   listId?: string;
   count: number;
   unread: number;
-  /** Part des messages lus (0 à 1) : un taux bas suggère un désabonnement. */
+  /** Share of read messages (0 to 1): a low rate suggests unsubscribing. */
   readRate: number;
   firstDate?: string;
   lastDate?: string;
-  /** Messages par semaine sur la période observée. */
+  /** Messages per week over the scanned period. */
   perWeek: number;
   accounts: string[];
   unsubscribe: UnsubscribeInfo;
-  /** Méthode de désabonnement disponible. */
-  unsubscribeMethod: "one-click" | "mailto" | "lien" | "aucune";
+  /** Available unsubscribe method. */
+  unsubscribeMethod: UnsubscribeMethod;
   sampleSubjects: string[];
   refs: string[];
 }
 
 export function groupKey(m: MessageSummary): string {
   const listId = m.listId?.match(/<([^>]+)>/)?.[1] ?? m.listId;
-  return (listId ?? m.fromAddress ?? "inconnu").toLowerCase();
+  return (listId ?? m.fromAddress ?? "unknown").toLowerCase();
 }
 
-export function unsubscribeMethod(u: UnsubscribeInfo): RecurringSender["unsubscribeMethod"] {
+export function unsubscribeMethod(u: UnsubscribeInfo): UnsubscribeMethod {
   if (u.oneClick) return "one-click";
   if (u.mailto.length) return "mailto";
-  if (u.http.length) return "lien";
-  return "aucune";
+  if (u.http.length) return "link";
+  return "none";
 }
 
-/** Regroupe des résumés par expéditeur et ne garde que les envois récurrents. */
+/** Groups summaries by sender and keeps only recurring ones. */
 export function groupRecurring(messages: MessageSummary[], minCount: number, days: number): RecurringSender[] {
   const groups = new Map<string, MessageSummary[]>();
   for (const m of messages) {
@@ -88,7 +90,7 @@ export interface RecurringScan {
   senders: RecurringSender[];
   scanned: number;
   errors: { accountId: string; error: string }[];
-  /** Résumés bruts, gardés en mémoire pour construire les plans. */
+  /** Raw summaries, kept in memory to build plans. */
   messages: MessageSummary[];
 }
 

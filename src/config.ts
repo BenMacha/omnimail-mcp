@@ -1,17 +1,21 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync, accessSync, constants } from "node:fs";
+import { accessSync, constants, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
+export type Language = "en" | "fr" | "ar";
+
 export interface Settings {
-  /** Envoi de mails autorisé (désactivé par défaut). */
+  /** Allow sending mail (off by default). */
   sendEnabled: boolean;
-  /** Nombre maximal de mails touchés par un plan. */
+  /** Maximum number of messages a single plan may touch. */
   maxActionsPerPlan: number;
-  /** Durée de validité d'un plan avant confirmation, en minutes. */
+  /** How long a plan stays valid before confirmation, in minutes. */
   planTtlMinutes: number;
-  /** Nombre maximal de résultats par compte pour une recherche. */
+  /** Maximum search results per account and folder. */
   searchLimitPerAccount: number;
-  /** Racine des dossiers créés par le classement. */
+  /** Language used for the folders omnimail creates. */
+  language: Language;
+  /** Root folder for sorting; empty = localized default ("Sorted", "Classement", "مرتب"). */
   classifyRoot: string;
 }
 
@@ -20,7 +24,8 @@ const DEFAULT_SETTINGS: Settings = {
   maxActionsPerPlan: 5000,
   planTtlMinutes: 15,
   searchLimitPerAccount: 50,
-  classifyRoot: "Classement",
+  language: "en",
+  classifyRoot: "",
 };
 
 function isWritable(dir: string): boolean {
@@ -33,9 +38,7 @@ function isWritable(dir: string): boolean {
 }
 
 export function dataDir(): string {
-  const dir =
-    process.env.OMNIMAIL_DATA_DIR ??
-    (existsSync("/data") && isWritable("/data") ? "/data" : join(homedir(), ".omnimail"));
+  const dir = process.env.OMNIMAIL_DATA_DIR ?? (existsSync("/data") && isWritable("/data") ? "/data" : join(homedir(), ".omnimail"));
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true, mode: 0o700 });
   return dir;
 }
@@ -53,6 +56,8 @@ export function loadSettings(): Settings {
   if (process.env.OMNIMAIL_SEND_ENABLED !== undefined) {
     settings.sendEnabled = process.env.OMNIMAIL_SEND_ENABLED === "true";
   }
+  const lang = process.env.OMNIMAIL_LANGUAGE;
+  if (lang === "en" || lang === "fr" || lang === "ar") settings.language = lang;
   return settings;
 }
 

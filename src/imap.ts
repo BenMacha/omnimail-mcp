@@ -18,7 +18,7 @@ export function createClient(account: Account): ImapFlow {
   });
 }
 
-/** Ouvre une connexion IMAP, exécute fn, puis ferme proprement. */
+/** Opens an IMAP connection, runs fn, then logs out cleanly. */
 export async function withImap<T>(account: Account, fn: (client: ImapFlow) => Promise<T>): Promise<T> {
   const client = createClient(account);
   await client.connect();
@@ -29,7 +29,7 @@ export async function withImap<T>(account: Account, fn: (client: ImapFlow) => Pr
   }
 }
 
-/** Exécute fn avec le dossier sélectionné et verrouillé. */
+/** Runs fn with the mailbox selected and locked. */
 export async function inMailbox<T>(client: ImapFlow, path: string, fn: () => Promise<T>): Promise<T> {
   const lock = await client.getMailboxLock(path);
   try {
@@ -44,7 +44,7 @@ export async function findSpecialUse(client: ImapFlow, use: string, folders?: Li
   return list.find((f) => f.specialUse === use)?.path;
 }
 
-/** Crée un dossier (et ses parents) à partir de segments, avec le bon séparateur du serveur. */
+/** Creates a folder (and its parents) from segments, using the server's delimiter. */
 export async function ensureFolder(client: ImapFlow, segments: string[]): Promise<string> {
   const folders = await client.list();
   const delimiter = folders.find((f) => f.delimiter)?.delimiter ?? "/";
@@ -61,7 +61,7 @@ export async function ensureFolder(client: ImapFlow, segments: string[]): Promis
 export function errorMessage(err: unknown): string {
   if (err && typeof err === "object") {
     const e = err as { responseText?: string; message?: string; authenticationFailed?: boolean };
-    if (e.authenticationFailed) return "Authentification refusée (mot de passe d'application révoqué ou incorrect).";
+    if (e.authenticationFailed) return "Authentication refused (app password revoked or wrong).";
     return e.responseText ?? e.message ?? String(err);
   }
   return String(err);

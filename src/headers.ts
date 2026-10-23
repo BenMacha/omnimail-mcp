@@ -1,4 +1,4 @@
-/** Analyse d'en-têtes bruts (RFC 5322) et des en-têtes de liste (RFC 2369, RFC 8058). */
+/** Raw header parsing (RFC 5322) and list headers (RFC 2369, RFC 8058). */
 
 export type HeaderMap = Map<string, string[]>;
 
@@ -22,11 +22,11 @@ export function header(map: HeaderMap, name: string): string | undefined {
 }
 
 export interface UnsubscribeInfo {
-  /** Liens https (ou http) annoncés. */
+  /** Advertised https (or http) links. */
   http: string[];
-  /** Adresses mailto annoncées (avec sujet / corps éventuels). */
+  /** Advertised mailto addresses (with optional subject / body). */
   mailto: string[];
-  /** RFC 8058 : un POST "List-Unsubscribe=One-Click" suffit. */
+  /** RFC 8058: a POST "List-Unsubscribe=One-Click" is enough. */
   oneClick: boolean;
 }
 
@@ -42,7 +42,7 @@ export function parseListUnsubscribe(value?: string, post?: string): Unsubscribe
   return info;
 }
 
-/** Extrait l'adresse e-mail d'une valeur "Nom <adresse>". */
+/** Extracts the e-mail address from a "Name <address>" value. */
 export function extractAddress(value?: string): string | undefined {
   if (!value) return undefined;
   const m = value.match(/<([^>]+)>/) ?? value.match(/([^\s<>"]+@[^\s<>"]+)/);
@@ -53,7 +53,7 @@ export function domainOf(address?: string): string | undefined {
   return address?.split("@")[1]?.toLowerCase();
 }
 
-/** Domaine « organisationnel » approximatif : deux derniers labels (trois pour co.uk, com.tn…). */
+/** Approximate organizational domain: last two labels (three for co.uk, com.tn…). */
 export function baseDomain(domain?: string): string | undefined {
   if (!domain) return undefined;
   const parts = domain.split(".");

@@ -3,7 +3,7 @@ import { isIP } from "node:net";
 import type { Account } from "../accounts.js";
 import { sendSimple } from "../smtp.js";
 
-/** Refuse les adresses internes (protection SSRF). */
+/** Rejects internal addresses (SSRF protection). */
 export function isPrivateAddress(ip: string): boolean {
   if (isIP(ip) === 6) {
     const v = ip.toLowerCase();
@@ -24,16 +24,16 @@ export function isPrivateAddress(ip: string): boolean {
 
 async function assertPublicUrl(url: string): Promise<URL> {
   const u = new URL(url);
-  if (u.protocol !== "https:") throw new Error("Seuls les liens https sont appelés automatiquement.");
+  if (u.protocol !== "https:") throw new Error("Only https links are called automatically.");
   if (process.env.OMNIMAIL_ALLOW_PRIVATE_URLS === "true") return u;
   const addresses = await lookup(u.hostname, { all: true });
   if (addresses.some((a) => isPrivateAddress(a.address))) {
-    throw new Error(`Lien refusé : ${u.hostname} pointe vers une adresse interne.`);
+    throw new Error(`Link refused: ${u.hostname} resolves to an internal address.`);
   }
   return u;
 }
 
-/** RFC 8058 : POST "List-Unsubscribe=One-Click", sans cookie ni authentification. */
+/** RFC 8058: POST "List-Unsubscribe=One-Click", without cookies or credentials. */
 export async function oneClickUnsubscribe(url: string): Promise<{ status: number }> {
   const u = await assertPublicUrl(url);
   const res = await fetch(u, {
@@ -43,7 +43,7 @@ export async function oneClickUnsubscribe(url: string): Promise<{ status: number
     redirect: "manual",
     signal: AbortSignal.timeout(15_000),
   });
-  if (res.status >= 400) throw new Error(`Le serveur de désabonnement a répondu ${res.status}.`);
+  if (res.status >= 400) throw new Error(`The unsubscribe server answered ${res.status}.`);
   return { status: res.status };
 }
 

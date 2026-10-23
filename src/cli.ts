@@ -1,49 +1,44 @@
 #!/usr/bin/env node
+import { timingSafeEqual } from "node:crypto";
+import { realpathSync } from "node:fs";
 import { createServer as createHttpServer } from "node:http";
 import { createInterface } from "node:readline";
-import { timingSafeEqual } from "node:crypto";
+import { fileURLToPath } from "node:url";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { AccountStore } from "./accounts.js";
-import { dataDir, loadSettings, saveSettings, type Settings } from "./config.js";
+import { flag, has, parseSettingValue } from "./args.js";
+import { dataDir, loadSettings, saveSettings } from "./config.js";
 import { PRESETS, presetForAddress } from "./presets.js";
 import { createServer, VERSION } from "./server.js";
 import { accountHealth } from "./services/read.js";
 
-const HELP = `omnimail ${VERSION} — serveur MCP multi-comptes mail
+const HELP = `omnimail ${VERSION} — multi-account e-mail MCP server
 
-Usage :
-  omnimail serve                       Serveur MCP en stdio (Claude Code, Claude Desktop…)
+Usage:
+  omnimail serve                       MCP server over stdio (Claude Code, Claude Desktop…)
   omnimail serve --http [--port 3333] [--host 127.0.0.1]
-                                       Serveur MCP HTTP (Streamable HTTP), jeton OMNIMAIL_HTTP_TOKEN obligatoire
-  omnimail accounts add                Ajout interactif d'un compte
+                                       MCP server over HTTP (Streamable HTTP), OMNIMAIL_HTTP_TOKEN required
+  omnimail accounts add                Interactive account setup
   omnimail accounts add --address A [--provider P] [--username U] [--name N]
         [--imap-host H --imap-port 993 --imap-starttls] [--smtp-host H --smtp-port 465 --smtp-starttls]
-        --password-stdin               Ajout non interactif (mot de passe lu sur l'entrée standard)
-  omnimail accounts list               Liste des comptes
-  omnimail accounts test [id]          Teste la connexion
-  omnimail accounts remove <id>        Supprime un compte et son secret
-  omnimail providers                   Fournisseurs préconfigurés
+        --password-stdin               Non-interactive setup (password read from stdin)
+  omnimail accounts list               List accounts
+  omnimail accounts test [id]          Test connections
+  omnimail accounts remove <id>        Remove an account and its secret
+  omnimail providers                   Preconfigured providers
   omnimail settings get
-  omnimail settings set <clé> <valeur> ex. sendEnabled true
+  omnimail settings set <key> <value>  e.g. sendEnabled true, language fr
 
-Données : ${"$"}OMNIMAIL_DATA_DIR, /data (Docker) ou ~/.omnimail`;
-
-function flag(args: string[], name: string): string | undefined {
-  const i = args.indexOf(`--${name}`);
-  return i >= 0 ? args[i + 1] : undefined;
-}
-
-function has(args: string[], name: string): boolean {
-  return args.includes(`--${name}`);
-}
+Data: $OMNIMAIL_DATA_DIR, /data (Docker) or ~/.omnimail`;
 
 function ask(question: string, hidden = false): Promise<string> {
   return new Promise((resolve) => {
     const rl = createInterface({ input: process.stdin, output: process.stderr, terminal: true });
     if (hidden) {
-      const write = (rl as unknown as { _writeToOutput: (s: string) => void })._writeToOutput;
-      (rl as unknown as { _writeToOutput: (s: string) => void })._writeToOutput = (s: string) => {
+      const out = rl as unknown as { _writeToOutput: (s: string) => void };
+      const write = out._writeToOutput;
+      out._writeToOutput = (s: string) => {
         if (s.startsWith(question)) write.call(rl, s);
         else if (s.includes("\n")) write.call(rl, "\n");
       };
@@ -64,34 +59,34 @@ async function readStdin(): Promise<string> {
 async function addAccount(args: string[]) {
   const store = new AccountStore();
   const interactive = !has(args, "password-stdin");
-  const address = flag(args, "address") ?? (interactive ? await ask("Adresse e-mail : ") : undefined);
-  if (!address) throw new Error("--address est obligatoire.");
+  const address = flag(args, "address") ?? (interactive ? await ask("E-mail address: ") : undefined);
+  if (!address) throw new Error("--address is required.");
   const guessed = presetForAddress(address);
   let providerId = flag(args, "provider") ?? guessed?.id;
   if (!providerId && interactive && !flag(args, "imap-host")) {
-    process.stderr.write(`Fournisseurs : ${Object.keys(PRESETS).join(", ")}, generic\n`);
-    providerId = (await ask("Fournisseur : ")) || "generic";
+    process.stderr.write(`Providers: ${Object.keys(PRESETS).join(", ")}, generic\n`);
+    providerId = (await ask("Provider: ")) || "generic";
   }
   providerId = providerId ?? "generic";
   const preset = PRESETS[providerId];
-  if (preset?.oauthOnly) throw new Error(`${preset.label} : ${preset.note}`);
+  if (preset?.oauthOnly) throw new Error(`${preset.label}: ${preset.note}`);
 
   let imap = preset?.imap;
   let smtp = preset?.smtp;
-  const imapHost = flag(args, "imap-host") ?? (!preset && interactive ? await ask("Serveur IMAP : ") : undefined);
+  const imapHost = flag(args, "imap-host") ?? (!preset && interactive ? await ask("IMAP server: ") : undefined);
   if (imapHost) imap = { host: imapHost, port: Number(flag(args, "imap-port") ?? 993), secure: !has(args, "imap-starttls") };
-  const smtpHost = flag(args, "smtp-host") ?? (!preset && interactive ? await ask("Serveur SMTP : ") : undefined);
+  const smtpHost = flag(args, "smtp-host") ?? (!preset && interactive ? await ask("SMTP server: ") : undefined);
   if (smtpHost) smtp = { host: smtpHost, port: Number(flag(args, "smtp-port") ?? 465), secure: !has(args, "smtp-starttls") };
-  if (!imap || !smtp) throw new Error("Serveurs IMAP et SMTP inconnus : utilisez --provider ou --imap-host / --smtp-host.");
+  if (!imap || !smtp) throw new Error("Unknown IMAP and SMTP servers: use --provider or --imap-host / --smtp-host.");
 
   if (interactive && preset) {
     process.stderr.write(`\n${preset.label}${preset.note ? ` — ${preset.note}` : ""}\n`);
-    if (preset.appPasswordUrl) process.stderr.write(`Créez un mot de passe d'application ici : ${preset.appPasswordUrl}\n`);
-    process.stderr.write("N'utilisez jamais le mot de passe principal du compte.\n\n");
+    if (preset.appPasswordUrl) process.stderr.write(`Create an app password here: ${preset.appPasswordUrl}\n`);
+    process.stderr.write("Never use the account's main password.\n\n");
   }
   const username = flag(args, "username") ?? address;
-  const secret = interactive ? await ask("Mot de passe d'application (masqué) : ", true) : await readStdin();
-  if (!secret) throw new Error("Mot de passe vide.");
+  const secret = interactive ? await ask("App password (hidden): ", true) : await readStdin();
+  if (!secret) throw new Error("Empty password.");
 
   const draft = {
     id: flag(args, "id"),
@@ -104,17 +99,17 @@ async function addAccount(args: string[]) {
     smtp,
     tlsInsecure: preset?.tlsInsecure,
   };
-  process.stderr.write("Test de la connexion IMAP…\n");
+  process.stderr.write("Testing the IMAP connection…\n");
   const health = await accountHealth({ ...draft, id: "test", createdAt: "" });
-  if (!health.ok && !has(args, "skip-test")) throw new Error(`Connexion refusée : ${health.error}`);
+  if (!health.ok && !has(args, "skip-test")) throw new Error(`Connection refused: ${health.error}`);
   const account = store.add(draft);
-  process.stderr.write(`Compte ajouté : ${account.id} (${health.inbox?.messages ?? "?"} messages dans la boîte de réception)\n`);
+  process.stderr.write(`Account added: ${account.id} (${health.inbox?.messages ?? "?"} messages in the inbox)\n`);
 }
 
 async function serveHttp(args: string[]) {
   const token = process.env.OMNIMAIL_HTTP_TOKEN;
   if (!token || token.length < 24) {
-    throw new Error("OMNIMAIL_HTTP_TOKEN (24 caractères minimum) est obligatoire pour le mode HTTP.");
+    throw new Error("OMNIMAIL_HTTP_TOKEN (at least 24 characters) is required for HTTP mode.");
   }
   const port = Number(flag(args, "port") ?? process.env.PORT ?? 3333);
   const host = flag(args, "host") ?? process.env.HOST ?? "127.0.0.1";
@@ -136,7 +131,13 @@ async function serveHttp(args: string[]) {
     }
     const chunks: Buffer[] = [];
     for await (const c of req) chunks.push(c as Buffer);
-    const body = chunks.length ? JSON.parse(Buffer.concat(chunks).toString("utf8")) : undefined;
+    let body: unknown;
+    try {
+      body = chunks.length ? JSON.parse(Buffer.concat(chunks).toString("utf8")) : undefined;
+    } catch {
+      res.writeHead(400).end("Invalid JSON");
+      return;
+    }
     const server = createServer();
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
     res.on("close", () => {
@@ -146,18 +147,18 @@ async function serveHttp(args: string[]) {
     await server.connect(transport);
     await transport.handleRequest(req, res, body);
   });
-  http.listen(port, host, () => process.stderr.write(`omnimail MCP HTTP sur http://${host}:${port}/mcp\n`));
+  http.listen(port, host, () => process.stderr.write(`omnimail MCP over HTTP on http://${host}:${port}/mcp\n`));
 }
 
-async function main() {
-  const [cmd, sub, ...rest] = process.argv.slice(2);
+export async function main(argv = process.argv.slice(2)) {
+  const [cmd, sub, ...rest] = argv;
   const args = [sub, ...rest].filter((x): x is string => x !== undefined);
   switch (cmd) {
     case undefined:
     case "serve":
       if (has(args, "http")) return serveHttp(args);
       await createServer().connect(new StdioServerTransport());
-      process.stderr.write(`omnimail ${VERSION} prêt (stdio), données : ${dataDir()}\n`);
+      process.stderr.write(`omnimail ${VERSION} ready (stdio), data: ${dataDir()}\n`);
       return;
     case "accounts": {
       const store = new AccountStore();
@@ -169,28 +170,28 @@ async function main() {
       if (sub === "test") {
         const list = rest[0] ? [store.get(rest[0])] : store.list();
         for (const h of await Promise.all(list.map(accountHealth))) {
-          console.log(`${h.ok ? "OK " : "ERR"}\t${h.address}\t${h.ok ? `${h.inbox?.unseen ?? 0} non lus / ${h.inbox?.messages ?? 0}` : h.error}`);
+          console.log(
+            `${h.ok ? "OK " : "ERR"}\t${h.address}\t${h.ok ? `${h.inbox?.unseen ?? 0} unread / ${h.inbox?.messages ?? 0}` : h.error}`,
+          );
         }
         return;
       }
       if (sub === "remove") {
-        if (!rest[0]) throw new Error("Indiquez l'identifiant du compte.");
+        if (!rest[0]) throw new Error("Give the account id.");
         store.remove(rest[0]);
-        console.log(`Compte ${rest[0]} supprimé, secret effacé du coffre.`);
+        console.log(`Account ${rest[0]} removed, secret erased from the vault.`);
         return;
       }
       break;
     }
     case "providers":
-      for (const p of Object.values(PRESETS)) console.log(`${p.id.padEnd(11)} ${p.label}${p.oauthOnly ? " (OAuth, bientôt)" : ""}`);
+      for (const p of Object.values(PRESETS)) console.log(`${p.id.padEnd(11)} ${p.label}${p.oauthOnly ? " (OAuth, coming soon)" : ""}`);
       return;
     case "settings":
       if (sub === "set") {
         const [key, value] = rest;
-        const current = loadSettings();
-        if (!key || !(key in current)) throw new Error(`Réglage inconnu. Réglages : ${Object.keys(current).join(", ")}`);
-        const typed = typeof current[key as keyof Settings] === "boolean" ? value === "true" : typeof current[key as keyof Settings] === "number" ? Number(value) : value;
-        console.log(JSON.stringify(saveSettings({ [key]: typed } as Partial<Settings>), null, 2));
+        if (!key) throw new Error("Usage: omnimail settings set <key> <value>");
+        console.log(JSON.stringify(saveSettings(parseSettingValue(loadSettings(), key, value)), null, 2));
         return;
       }
       console.log(JSON.stringify(loadSettings(), null, 2));
@@ -203,7 +204,17 @@ async function main() {
   console.log(HELP);
 }
 
-main().catch((err) => {
-  process.stderr.write(`Erreur : ${err instanceof Error ? err.message : String(err)}\n`);
-  process.exit(1);
-});
+function isEntryPoint(): boolean {
+  try {
+    return realpathSync(process.argv[1] ?? "") === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
+
+if (isEntryPoint()) {
+  main().catch((err) => {
+    process.stderr.write(`Error: ${err instanceof Error ? err.message : String(err)}\n`);
+    process.exit(1);
+  });
+}

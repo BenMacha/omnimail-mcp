@@ -1,5 +1,5 @@
-import { Vault } from "./vault.js";
 import { PRESETS, type ServerEndpoint } from "./presets.js";
+import { Vault } from "./vault.js";
 
 export interface Account {
   id: string;
@@ -14,7 +14,7 @@ export interface Account {
   createdAt: string;
 }
 
-/** Vue publique d'un compte : jamais de secret. */
+/** Public view of an account: never any secret. */
 export type PublicAccount = Omit<Account, "secret" | "username">;
 
 interface VaultContent {
@@ -30,7 +30,7 @@ export class AccountStore {
 
   get(id: string): Account {
     const account = this.list().find((a) => a.id === id || a.address === id);
-    if (!account) throw new Error(`Compte inconnu : ${id}`);
+    if (!account) throw new Error(`Unknown account: ${id}`);
     return account;
   }
 
@@ -43,7 +43,7 @@ export class AccountStore {
   add(input: Omit<Account, "id" | "createdAt"> & { id?: string }): Account {
     const accounts = this.list();
     const id = input.id ?? slug(input.address);
-    if (accounts.some((a) => a.id === id)) throw new Error(`Un compte ${id} existe déjà.`);
+    if (accounts.some((a) => a.id === id)) throw new Error(`Account ${id} already exists.`);
     const account: Account = { ...input, id, createdAt: new Date().toISOString() };
     this.vault.write({ accounts: [...accounts, account] });
     return account;

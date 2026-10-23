@@ -7,7 +7,7 @@ import { errorMessage, findSpecialUse, inMailbox, withImap } from "../imap.js";
 import { decodeRef } from "../refs.js";
 import { mailtoUnsubscribe, oneClickUnsubscribe } from "./unsubscribe.js";
 
-/** Destination d'un déplacement : chemin explicite ou dossier spécial du serveur. */
+/** Move destination: explicit path or a server special-use folder. */
 export type Destination =
   | { kind: "path"; segments: string[] }
   | { kind: "special"; use: "\\Trash" | "\\Archive" | "\\Junk"; fallback: string[] };
@@ -15,7 +15,7 @@ export type Destination =
 export interface MoveAction {
   type: "move";
   ref: string;
-  /** Clé de l'expéditeur (adresse ou List-Id), pour les exclusions. */
+  /** Sender key (address or List-Id), used for exclusions. */
   sender?: string;
   messageId?: string;
   to: Destination;
@@ -26,7 +26,7 @@ export interface UnsubscribeAction {
   accountId: string;
   sender: string;
   name?: string;
-  method: "one-click" | "mailto" | "lien";
+  method: "one-click" | "mailto" | "link";
   target: string;
 }
 
@@ -51,7 +51,7 @@ export interface PlanResult {
   undoneAt?: string;
 }
 
-export type PlanKind = "classement" | "nettoyage" | "desabonnement";
+export type PlanKind = "classify" | "cleanup" | "unsubscribe";
 
 export interface Plan {
   id: string;
@@ -60,7 +60,7 @@ export interface Plan {
   token: string;
   createdAt: string;
   expiresAt: string;
-  status: "en_attente" | "applique" | "defait" | "expire";
+  status: "pending" | "applied" | "undone" | "expired";
   actions: PlannedAction[];
   result?: PlanResult;
 }
@@ -85,9 +85,7 @@ export class PlanStore {
     const settings = loadSettings();
     const moves = actions.filter((a) => a.type === "move").length;
     if (moves > settings.maxActionsPerPlan) {
-      throw new Error(
-        `Plan trop gros (${moves} mails, maximum ${settings.maxActionsPerPlan}). Restreignez la période ou les critères.`,
-      );
+      throw new Error(`Plan too large (${moves} messages, maximum ${settings.maxActionsPerPlan}). Narrow the period or the criteria.`);
     }
     const now = Date.now();
     const plan: Plan = {
@@ -97,7 +95,7 @@ export class PlanStore {
       token: randomBytes(9).toString("base64url"),
       createdAt: new Date(now).toISOString(),
       expiresAt: new Date(now + settings.planTtlMinutes * 60_000).toISOString(),
-      status: "en_attente",
+      status: "pending",
       actions,
     };
     this.writeAll([...this.readAll(), plan]);
@@ -106,8 +104,8 @@ export class PlanStore {
 
   get(id: string): Plan {
     const plan = this.readAll().find((p) => p.id === id);
-    if (!plan) throw new Error(`Plan inconnu ou trop ancien : ${id}`);
-    if (plan.status === "en_attente" && new Date(plan.expiresAt).getTime() < Date.now()) plan.status = "expire";
+    if (!plan) throw new Error(`Unknown or expired plan: ${id}`);
+    if (plan.status === "pending" && new Date(plan.expiresAt).getTime() < Date.now()) plan.status = "expired";
     return plan;
   }
 
@@ -124,15 +122,11 @@ export function checkToken(plan: Plan, token: string): void {
   const a = Buffer.from(plan.token);
   const b = Buffer.from(token ?? "");
   if (a.length !== b.length || !timingSafeEqual(a, b)) {
-    throw new Error("Jeton de confirmation invalide : présentez le plan à l'utilisateur et utilisez le jeton fourni.");
+    throw new Error("Invalid confirmation token: show the plan to the user and use the token it came with.");
   }
 }
 
-async function resolveDestination(
-  client: ImapFlow,
-  dest: Destination,
-  created: Set<string>,
-): Promise<string> {
+async function resolveDestination(client: ImapFlow, dest: Destination, created: Set<string>): Promise<string> {
   const folders = await client.list();
   if (dest.kind === "special") {
     const found = await findSpecialUse(client, dest.use, folders);
@@ -159,9 +153,15 @@ export interface ApplyOptions {
   excludeSenders?: string[];
 }
 
-export async function applyPlan(store: PlanStore, accounts: AccountStore, planId: string, token: string, opts: ApplyOptions = {}): Promise<Plan> {
+export async function applyPlan(
+  store: PlanStore,
+  accounts: AccountStore,
+  planId: string,
+  token: string,
+  opts: ApplyOptions = {},
+): Promise<Plan> {
   const plan = store.get(planId);
-  if (plan.status !== "en_attente") throw new Error(`Ce plan est « ${plan.status} » : il ne peut plus être appliqué.`);
+  if (plan.status !== "pending") throw new Error(`This plan is "${plan.status}": it can no longer be applied.`);
   checkToken(plan, token);
 
   const excludedRefs = new Set(opts.excludeRefs ?? []);
@@ -169,9 +169,16 @@ export async function applyPlan(store: PlanStore, accounts: AccountStore, planId
   const isExcluded = (sender?: string) =>
     Boolean(sender && excludedSenders.some((x) => sender.toLowerCase() === x || sender.toLowerCase().endsWith(x)));
 
-  const result: PlanResult = { appliedAt: new Date().toISOString(), moved: [], createdFolders: [], unsubscribed: [], manualLinks: [], errors: [] };
+  const result: PlanResult = {
+    appliedAt: new Date().toISOString(),
+    moved: [],
+    createdFolders: [],
+    unsubscribed: [],
+    manualLinks: [],
+    errors: [],
+  };
 
-  // Désabonnements
+  // Unsubscribes
   for (const action of plan.actions) {
     if (action.type !== "unsubscribe" || isExcluded(action.sender)) continue;
     try {
@@ -180,19 +187,17 @@ export async function applyPlan(store: PlanStore, accounts: AccountStore, planId
         result.unsubscribed.push({ sender: action.sender, method: "one-click", detail: `HTTP ${r.status}` });
       } else if (action.method === "mailto") {
         const r = await mailtoUnsubscribe(accounts.get(action.accountId), action.target);
-        result.unsubscribed.push({ sender: action.sender, method: "mailto", detail: `demande envoyée à ${r.to}` });
+        result.unsubscribed.push({ sender: action.sender, method: "mailto", detail: `request sent to ${r.to}` });
       } else {
         result.manualLinks.push({ sender: action.sender, url: action.target });
       }
     } catch (err) {
-      result.errors.push(`Désabonnement ${action.sender} : ${errorMessage(err)}`);
+      result.errors.push(`Unsubscribe ${action.sender}: ${errorMessage(err)}`);
     }
   }
 
-  // Déplacements, regroupés par compte → dossier source → destination
-  const moves = plan.actions.filter(
-    (a): a is MoveAction => a.type === "move" && !excludedRefs.has(a.ref) && !isExcluded(a.sender),
-  );
+  // Moves, grouped by account → source folder → destination
+  const moves = plan.actions.filter((a): a is MoveAction => a.type === "move" && !excludedRefs.has(a.ref) && !isExcluded(a.sender));
   const byAccount = new Map<string, MoveAction[]>();
   for (const m of moves) {
     const { accountId } = decodeRef(m.ref);
@@ -229,7 +234,7 @@ export async function applyPlan(store: PlanStore, accounts: AccountStore, planId
                 const res = await client.messageMove(uids, dest, { uid: true });
                 for (const m of chunk) {
                   const uid = decodeRef(m.ref).uid;
-                  // Avec UIDPLUS, le serveur confirme chaque message déplacé : on ignore ceux qui n'existaient plus.
+                  // With UIDPLUS the server confirms each moved message: skip those that no longer existed.
                   if (res && res.uidMap && res.uidMap.size > 0 && !res.uidMap.has(uid)) continue;
                   result.moved.push({
                     accountId,
@@ -241,7 +246,7 @@ export async function applyPlan(store: PlanStore, accounts: AccountStore, planId
                   });
                 }
               } catch (err) {
-                result.errors.push(`${accountId} ${g.folder} → ${dest} : ${errorMessage(err)}`);
+                result.errors.push(`${accountId} ${g.folder} → ${dest}: ${errorMessage(err)}`);
               }
             }
           });
@@ -249,20 +254,24 @@ export async function applyPlan(store: PlanStore, accounts: AccountStore, planId
         for (const path of created) result.createdFolders.push({ accountId, path });
       });
     } catch (err) {
-      result.errors.push(`${accountId} : ${errorMessage(err)}`);
+      result.errors.push(`${accountId}: ${errorMessage(err)}`);
     }
   }
 
-  plan.status = "applique";
+  plan.status = "applied";
   plan.result = result;
   store.save(plan);
   return plan;
 }
 
-/** Remet les mails déplacés à leur place et supprime les dossiers créés s'ils sont vides. */
-export async function undoPlan(store: PlanStore, accounts: AccountStore, planId: string): Promise<{ restored: number; errors: string[]; removedFolders: string[] }> {
+/** Moves messages back and deletes the folders the plan created, if they are empty. */
+export async function undoPlan(
+  store: PlanStore,
+  accounts: AccountStore,
+  planId: string,
+): Promise<{ restored: number; errors: string[]; removedFolders: string[] }> {
   const plan = store.get(planId);
-  if (plan.status !== "applique" || !plan.result) throw new Error("Seul un plan appliqué peut être défait.");
+  if (plan.status !== "applied" || !plan.result) throw new Error("Only an applied plan can be undone.");
   const errors: string[] = [];
   const removedFolders: string[] = [];
   let restored = 0;
@@ -295,7 +304,7 @@ export async function undoPlan(store: PlanStore, accounts: AccountStore, planId:
                 await client.messageMove(chunk, from, { uid: true });
                 restored += chunk.length;
               } catch (err) {
-                errors.push(`${accountId} ${to} → ${from} : ${errorMessage(err)}`);
+                errors.push(`${accountId} ${to} → ${from}: ${errorMessage(err)}`);
               }
             }
           });
@@ -310,16 +319,16 @@ export async function undoPlan(store: PlanStore, accounts: AccountStore, planId:
               removedFolders.push(path);
             }
           } catch (err) {
-            errors.push(`Suppression du dossier ${path} : ${errorMessage(err)}`);
+            errors.push(`Deleting folder ${path}: ${errorMessage(err)}`);
           }
         }
       });
     } catch (err) {
-      errors.push(`${accountId} : ${errorMessage(err)}`);
+      errors.push(`${accountId}: ${errorMessage(err)}`);
     }
   }
 
-  plan.status = "defait";
+  plan.status = "undone";
   plan.result.undoneAt = new Date().toISOString();
   store.save(plan);
   return { restored, errors, removedFolders };

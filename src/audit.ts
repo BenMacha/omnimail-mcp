@@ -8,7 +8,7 @@ export interface AuditEntry {
   summary: string;
 }
 
-/** Journal local des actions d'écriture. Jamais de contenu de mail ni de secret. */
+/** Local log of write actions. Never any mail content or secret. */
 export function audit(tool: string, summary: string, accounts?: string[]): void {
   const entry: AuditEntry = { at: new Date().toISOString(), tool, accounts, summary };
   appendFileSync(dataPath("audit.log"), `${JSON.stringify(entry)}\n`, { mode: 0o600 });

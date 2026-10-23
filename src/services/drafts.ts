@@ -1,5 +1,5 @@
-import MailComposer from "nodemailer/lib/mail-composer/index.js";
 import { simpleParser } from "mailparser";
+import MailComposer from "nodemailer/lib/mail-composer/index.js";
 import type { Account } from "../accounts.js";
 import { ensureFolder, findSpecialUse, inMailbox, isGmail, withImap } from "../imap.js";
 import { encodeRef, type MessageRef } from "../refs.js";
@@ -42,7 +42,10 @@ export async function createReply(account: Account, original: MessageRef, body: 
   const replyTarget = parsed.replyTo?.value ?? parsed.from?.value ?? [];
   const to = replyTarget.map((a) => a.address!).filter(Boolean);
   const others = replyAll
-    ? [...(Array.isArray(parsed.to) ? parsed.to : parsed.to ? [parsed.to] : []), ...(Array.isArray(parsed.cc) ? parsed.cc : parsed.cc ? [parsed.cc] : [])]
+    ? [
+        ...(Array.isArray(parsed.to) ? parsed.to : parsed.to ? [parsed.to] : []),
+        ...(Array.isArray(parsed.cc) ? parsed.cc : parsed.cc ? [parsed.cc] : []),
+      ]
         .flatMap((x) => x.value.map((v) => v.address!))
         .filter((a) => a && a.toLowerCase() !== account.address.toLowerCase() && !to.includes(a))
     : [];
@@ -58,13 +61,13 @@ export async function createReply(account: Account, original: MessageRef, body: 
   });
 }
 
-/** Envoie un brouillon existant, l'enregistre dans « Envoyés » (sauf Gmail qui le fait seul) puis le supprime des brouillons. */
+/** Sends an existing draft, stores it in Sent (except Gmail, which does it itself), then removes the draft. */
 export async function sendDraft(account: Account, draft: MessageRef): Promise<{ messageId?: string; to: string[] }> {
   const raw = await fetchSource(account, draft);
   const parsed = await simpleParser(raw);
   const list = (v: typeof parsed.to) => (Array.isArray(v) ? v : v ? [v] : []).flatMap((x) => x.value.map((a) => a.address!));
   const to = [...list(parsed.to), ...list(parsed.cc), ...list(parsed.bcc)].filter(Boolean);
-  if (to.length === 0) throw new Error("Le brouillon n'a aucun destinataire.");
+  if (to.length === 0) throw new Error("The draft has no recipient.");
   await sendRaw(account, { from: account.address, to }, raw);
   await withImap(account, async (client) => {
     if (!isGmail(account)) {

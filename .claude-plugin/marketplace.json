@@ -1,12 +1,17 @@
 {
   "name": "omnimail",
-  "owner": { "name": "D'Ali Ben Macha", "email": "contact@benmacha.tn" },
-  "metadata": { "description": "Outils mail pour Claude Code : multi-comptes, désabonnement, classement, nettoyage" },
+  "owner": {
+    "name": "D'Ali Ben Macha",
+    "email": "contact@benmacha.tn"
+  },
+  "metadata": {
+    "description": "E-mail tools for Claude Code: multi-account, unsubscribe, sorting, cleanup"
+  },
   "plugins": [
     {
       "name": "omnimail",
       "source": "./plugin",
-      "description": "Serveur MCP multi-comptes mail (iCloud, Gmail, Yahoo, Infomaniak, Proton, IMAP) et skills de tri, désabonnement, classement et nettoyage.",
+      "description": "Multi-account e-mail MCP server (iCloud, Gmail, Yahoo, Infomaniak, Proton, IMAP) with skills for triage, unsubscribing, sorting and cleanup.",
       "version": "0.1.0",
       "license": "AGPL-3.0-only",
       "homepage": "https://github.com/BenMacha/omnimail-mcp",

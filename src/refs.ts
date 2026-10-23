@@ -1,6 +1,6 @@
 /**
- * Référence stable d'un message : compte + dossier + UID.
- * Format : "<compte>|<dossier encodé>|<uid>".
+ * Stable message reference: account + folder + UID.
+ * Format: "<account>|<url-encoded folder>|<uid>".
  */
 export interface MessageRef {
   accountId: string;
@@ -16,12 +16,12 @@ export function decodeRef(value: string): MessageRef {
   const [accountId, folder, uid] = value.split("|");
   const n = Number(uid);
   if (!accountId || folder === undefined || !Number.isInteger(n)) {
-    throw new Error(`Référence de message invalide : ${value}`);
+    throw new Error(`Invalid message reference: ${value}`);
   }
   return { accountId, folder: decodeURIComponent(folder), uid: n };
 }
 
-/** Regroupe des références par compte puis par dossier. */
+/** Groups references by account, then by folder. */
 export function groupRefs(refs: MessageRef[]): Map<string, Map<string, number[]>> {
   const out = new Map<string, Map<string, number[]>>();
   for (const r of refs) {
