@@ -1,0 +1,61 @@
+# Utilisation locale :
+#   docker compose run --rm omnimail accounts add       # ajouter un compte (interactif)
+#   docker compose run --rm omnimail accounts test      # tester les connexions
+# Le client MCP (Claude Code, Claude Desktop…) lance lui-même le conteneur en stdio, voir docs/CLIENTS.md.
+#
+# Mode HTTP (pour un client qui ne sait parler qu'à une URL) :
+#   OMNIMAIL_HTTP_TOKEN=$(openssl rand -hex 24) docker compose --profile http up -d
+#
+# Proton Mail : docker compose --profile proton run --rm proton-bridge init   (connexion unique au Bridge)
+
+name: omnimail
+
+services:
+  omnimail:
+    image: ghcr.io/benmacha/omnimail-mcp:latest
+    build: .
+    stdin_open: true
+    volumes:
+      - omnimail-data:/data
+    secrets:
+      - omnimail_master_key
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    profiles: [cli]
+
+  omnimail-http:
+    image: ghcr.io/benmacha/omnimail-mcp:latest
+    build: .
+    command: ["serve", "--http", "--host", "0.0.0.0", "--port", "3333"]
+    environment:
+      OMNIMAIL_HTTP_TOKEN: ${OMNIMAIL_HTTP_TOKEN:?définir OMNIMAIL_HTTP_TOKEN}
+    ports:
+      - "127.0.0.1:3333:3333"
+    volumes:
+      - omnimail-data:/data
+    secrets:
+      - omnimail_master_key
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+    profiles: [http]
+
+  proton-bridge:
+    # Image communautaire du Proton Mail Bridge officiel (abonnement Proton payant requis).
+    image: shenxn/protonmail-bridge:latest
+    volumes:
+      - proton-bridge:/root
+    restart: unless-stopped
+    profiles: [proton]
+
+secrets:
+  omnimail_master_key:
+    file: ${OMNIMAIL_MASTER_KEY_FILE:-./secrets/omnimail_master_key}
+
+volumes:
+  omnimail-data:
+  proton-bridge:

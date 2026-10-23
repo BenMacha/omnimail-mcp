@@ -1,133 +1,156 @@
 # omnimail-mcp
 
-> Un serveur **MCP** (Model Context Protocol) open source qui relie **toutes vos boîtes mail** — iCloud, Gmail, Outlook, Yahoo, Proton, Infomaniak, et n'importe quel serveur IMAP — à votre assistant IA : **Claude Code, Claude (web / desktop), ChatGPT, Perplexity**.
+> Un serveur **MCP** (Model Context Protocol) open source qui relie **toutes vos boîtes mail** — iCloud, Gmail, Yahoo, Infomaniak, Proton, et n'importe quel serveur IMAP — à votre assistant IA : **Claude Code, Claude Desktop, Claude.ai, ChatGPT, Perplexity**.
 >
-> Lire, chercher dans tous les comptes à la fois, résumer, préparer des réponses, trier, nettoyer, détecter le spam, archiver — en gardant le contrôle de vos données, conformément au **RGPD** et aux recommandations de la **CNIL**.
+> Chercher dans tous les comptes à la fois, repérer les envois récurrents et s'en désabonner, ranger en sous-dossiers (et tout déclasser), nettoyer, détecter les arnaques, préparer des réponses — en gardant le contrôle de vos données (RGPD).
 
-**Statut : conception (phase 0).** Le code n'existe pas encore ; ce dépôt contient le plan, l'architecture et le cadre de conformité. Voir [docs/PLAN.md](docs/PLAN.md).
+**Statut : 0.1.0, version locale fonctionnelle.** Voir [docs/PLAN.md](docs/PLAN.md) pour la suite (Outlook, OAuth, archivage planifié…).
 
 ---
 
 ## Sommaire
 
-- [Pourquoi](#pourquoi)
-- [Ce que l'outil fera](#ce-que-loutil-fera)
-- [Deux modes d'utilisation](#deux-modes-dutilisation)
+- [Ce que l'outil fait](#ce-que-loutil-fait)
+- [Installation](#installation)
+- [Ajouter vos comptes](#ajouter-vos-comptes)
+- [Exemples de demandes](#exemples-de-demandes)
 - [Fournisseurs pris en charge](#fournisseurs-pris-en-charge)
-- [Clients IA compatibles](#clients-ia-compatibles)
-- [Démarrage rapide (cible)](#démarrage-rapide-cible)
 - [Sécurité et vie privée](#sécurité-et-vie-privée)
+- [Développement](#développement)
 - [Documentation](#documentation)
 - [Licence](#licence)
 
 ---
 
-## Pourquoi
+## Ce que l'outil fait
 
-Les assistants IA savent lire du texte, mais vos mails sont éparpillés entre plusieurs fournisseurs, chacun avec son mode de connexion (mot de passe d'application, OAuth, pont local pour Proton…). `omnimail-mcp` offre **une seule interface** pour tous vos comptes, exposée en MCP, le standard ouvert que comprennent Claude, ChatGPT et les autres.
-
-## Ce que l'outil fera
-
-| Domaine | Exemples d'outils MCP |
+| Domaine | Outils MCP |
 |---|---|
-| Comptes | `accounts_list`, `account_status` (santé de chaque connexion) |
-| Lecture | `mail_search` (tous comptes), `mail_get`, `thread_get`, `folders_list`, `attachment_get` |
-| Réponse | `draft_create`, `draft_reply` (brouillon), `mail_send` (confirmation obligatoire) |
-| Organisation | `mail_move`, `mail_flag`, `mail_mark_read`, `label_apply`, `folder_create` |
-| Nettoyage | `cleanup_plan` (simulation), `cleanup_apply`, `newsletters_list`, `unsubscribe` (RFC 8058) |
-| Spam & sécurité | `spam_score` (SPF / DKIM / DMARC + heuristiques + Rspamd optionnel), `phishing_check` |
-| Archivage | `archive_export` (EML / MBOX), `archive_schedule`, alertes en cas de déconnexion |
+| Comptes | `accounts_list`, `account_status` (connexion OK ou cause de l'échec) |
+| Lecture | `mail_search` (tous les comptes en parallèle), `mail_get`, `attachment_get`, `folders_list` |
+| Envois récurrents | `recurring_senders_list` : volume, fréquence, taux de lecture, méthode de désabonnement |
+| Désabonnement | `unsubscribe_plan` : désabonnement one-click (RFC 8058) ou par mail, et rangement des anciens mails |
+| Classement | `classify_plan` : sous-dossiers par catégorie (Factures, Banque, Commandes, Voyages, Newsletters…), par expéditeur ou par règles |
+| Nettoyage | `cleanup_plan` : archive ou corbeille selon catégorie, expéditeur, ancienneté, taille |
+| Plans | `plan_apply` (après accord), `plan_undo` (**déclasser** / annuler), `plans_list` |
+| Organisation | `mail_move`, `mail_mark` (lu, important) |
+| Spam & arnaques | `spam_check` : SPF / DKIM / DMARC, usurpation, liens trompeurs, pièces jointes dangereuses, faux changement de RIB |
+| Réponses | `draft_create`, `draft_reply`, `mail_send` (désactivé par défaut) |
+| Suivi | `audit_log`, `settings_get` |
 
-Toute action destructrice passe par un **plan en simulation (dry-run)** que l'utilisateur valide avant exécution.
+**Toute modification en masse passe par un plan** : l'outil montre ce qu'il va faire, l'utilisateur valide, puis `plan_apply` exécute. Chaque plan est **annulable** pendant 30 jours avec `plan_undo` (sauf les désabonnements, par nature).
 
-Des **prompts MCP / skills** prêts à l'emploi : « tri du matin », « grand ménage newsletters », « détection d'arnaques », « résumé de la semaine », « réponses en attente ».
+Prompts MCP et skills inclus : `tri-du-matin`, `menage-newsletters`, `classement-dossiers`, `grand-nettoyage`, `detecteur-arnaques`, `reponses-en-attente`.
 
-## Deux modes d'utilisation
+## Installation
 
-```mermaid
-flowchart LR
-  subgraph Local["Mode 1 — Local / auto-hébergé (recommandé)"]
-    C1[Claude Code / Claude Desktop] -- stdio --> S1[omnimail-mcp<br/>conteneur Docker]
-    S1 --> V1[(Coffre chiffré<br/>sur votre machine)]
-  end
-  subgraph Hosted["Mode 2 — Hébergé (mcp.benmacha.tn)"]
-    C2[Claude.ai / ChatGPT / Perplexity] -- HTTPS + OAuth 2.1 --> CF[Cloudflare Tunnel]
-    CF --> S2[omnimail-mcp<br/>Docker]
-    S2 --> V2[(PostgreSQL<br/>secrets chiffrés)]
-  end
-  S1 & S2 --> P[(IMAP / SMTP / Graph / Gmail API)]
-```
+Prérequis : Docker.
 
-- **Local** : vous lancez le conteneur chez vous, vos identifiants ne quittent jamais votre machine. Vous êtes votre propre responsable de traitement.
-- **Hébergé** : une URL publique pour les clients web (Claude.ai, ChatGPT) qui ne savent pas parler à un programme local. Connexion par compte + OAuth, secrets chiffrés, hébergement UE.
+### Claude Code — via la marketplace de ce dépôt (recommandé)
 
-## Fournisseurs pris en charge
-
-| Fournisseur | Méthode | Remarque |
-|---|---|---|
-| iCloud Mail | IMAP/SMTP + mot de passe d'application | Pas d'OAuth chez Apple |
-| Gmail / Google Workspace | IMAP + mot de passe d'application, ou OAuth (XOAUTH2 / Gmail API) | OAuth public = audit de sécurité Google |
-| Outlook.com / Microsoft 365 | OAuth 2.0 (Microsoft Graph ou IMAP XOAUTH2) | L'authentification par mot de passe IMAP n'est plus acceptée |
-| Yahoo Mail / AOL | IMAP/SMTP + mot de passe d'application | |
-| Proton Mail | Proton Mail Bridge (conteneur dédié) | Nécessite un abonnement payant Proton |
-| Infomaniak | IMAP/SMTP | `mail.infomaniak.com` |
-| Autres (OVH, Zoho, GMX, Fastmail, serveur perso…) | IMAP/SMTP générique (JMAP plus tard) | |
-
-Détails : [docs/FOURNISSEURS.md](docs/FOURNISSEURS.md).
-
-## Clients IA compatibles
-
-| Client | Mode | Comment |
-|---|---|---|
-| Claude Code | local (stdio) ou distant | `claude mcp add` ou plugin via la marketplace de ce dépôt |
-| Claude Desktop | local | extension `.mcpb` ou config JSON |
-| Claude.ai (web / mobile) | hébergé | Paramètres → Connecteurs → connecteur personnalisé |
-| ChatGPT | hébergé | Mode développeur → connecteur / app MCP |
-| Perplexity | local (app Mac) / distant selon offre | à vérifier lors des tutoriels |
-
-Instructions pas à pas (avec captures à venir) : [docs/CLIENTS.md](docs/CLIENTS.md).
-
-## Démarrage rapide (cible)
-
-> Ces commandes décrivent l'objectif de la phase 1 ; elles ne fonctionnent pas encore.
-
-```bash
-# Claude Code — mode local, via Docker
-claude mcp add omnimail -- docker run -i --rm \
-  -v omnimail-data:/data ghcr.io/benmacha/omnimail-mcp:latest
-
-# Ajouter un compte (assistant interactif, le mot de passe n'est jamais affiché)
-docker run -it --rm -v omnimail-data:/data ghcr.io/benmacha/omnimail-mcp:latest accounts add
-```
-
-```bash
-# Claude Code — via la marketplace de plugins de ce dépôt
+```text
 /plugin marketplace add BenMacha/omnimail-mcp
 /plugin install omnimail@omnimail
 ```
 
+Le plugin installe le serveur MCP et les skills.
+
+### Claude Code — commande directe
+
+```bash
+claude mcp add omnimail -- docker run -i --rm -v omnimail-data:/data ghcr.io/benmacha/omnimail-mcp:latest
+```
+
+### Claude Desktop, Perplexity (Mac), autres clients stdio
+
+```json
+{
+  "mcpServers": {
+    "omnimail": {
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "-v", "omnimail-data:/data", "ghcr.io/benmacha/omnimail-mcp:latest"]
+    }
+  }
+}
+```
+
+### Claude.ai, ChatGPT et clients qui demandent une URL
+
+```bash
+OMNIMAIL_HTTP_TOKEN=$(openssl rand -hex 24) docker compose --profile http up -d
+# → http://127.0.0.1:3333/mcp, en-tête Authorization: Bearer <jeton>
+```
+
+L'exposition publique (HTTPS, connexion OAuth pour Claude.ai / ChatGPT) est prévue en phase 5 ; d'ici là, ce mode est destiné à un usage local ou derrière votre propre proxy HTTPS.
+
+Détails par client : [docs/CLIENTS.md](docs/CLIENTS.md).
+
+## Ajouter vos comptes
+
+```bash
+docker run -it --rm -v omnimail-data:/data ghcr.io/benmacha/omnimail-mcp:latest accounts add
+docker run -it --rm -v omnimail-data:/data ghcr.io/benmacha/omnimail-mcp:latest accounts test
+```
+
+L'assistant détecte le fournisseur depuis l'adresse, indique où créer le **mot de passe d'application**, masque la saisie et teste la connexion avant d'enregistrer. Autres commandes : `accounts list`, `accounts remove <id>`, `providers`, `settings get|set`.
+
+Pour mettre la clé de chiffrement hors du volume de données (recommandé) : `docker compose` avec le secret `omnimail_master_key`, ou la variable `OMNIMAIL_MASTER_KEY_FILE`.
+
+## Exemples de demandes
+
+- « Quels sont les expéditeurs qui m'écrivent le plus et que je ne lis jamais ? Désabonne-moi des cinq premiers et range leurs anciens mails dans un dossier. »
+- « Classe ma boîte de réception iCloud en sous-dossiers par catégorie. » … puis « Finalement, déclasse tout. »
+- « Archive les notifications et les réseaux sociaux lus de plus de six mois, sur tous mes comptes. »
+- « Ce mail de "PayPal" est-il une arnaque ? »
+- « Retrouve la facture EDF de septembre et prépare une réponse au service client. »
+
+## Fournisseurs pris en charge
+
+| Fournisseur | Connexion | État |
+|---|---|---|
+| iCloud Mail | mot de passe d'application | ✅ |
+| Gmail / Google Workspace | mot de passe d'application (OAuth en phase 4) | ✅ |
+| Yahoo, AOL | mot de passe d'application | ✅ |
+| Infomaniak | mot de passe (d'application si 2FA) | ✅ |
+| Proton Mail | Proton Mail Bridge (profil Docker `proton`) | ✅ |
+| Fastmail, Zoho, GMX, OVHcloud, IMAP générique | IMAP/SMTP | ✅ |
+| Outlook.com / Microsoft 365 | OAuth obligatoire chez Microsoft | phase 4 |
+
+Détails : [docs/FOURNISSEURS.md](docs/FOURNISSEURS.md).
+
 ## Sécurité et vie privée
 
-- **Jamais votre mot de passe principal** : mots de passe d'application ou OAuth uniquement.
-- Secrets **chiffrés au repos** (coffre local chiffré / chiffrement par enveloppe côté hébergé).
-- **Pas de copie des mails** côté serveur par défaut : lecture à la demande, cache optionnel et purgeable.
-- Actions destructrices = **simulation + confirmation**, journal d'audit consultable.
-- Protection contre l'**injection de prompt** contenue dans les mails (contenu marqué comme non fiable, envoi jamais automatique).
-- Droit d'accès, d'export et d'effacement en un clic (mode hébergé).
+- **Jamais votre mot de passe principal** : uniquement des mots de passe d'application, révocables chez le fournisseur.
+- Comptes stockés dans un **coffre chiffré** (AES-256-GCM, clé dérivée par scrypt) ; aucun secret dans un fichier `.env`, un journal ou une réponse d'outil.
+- **Aucune copie des mails** : lecture à la demande, rien n'est stocké hors des plans (références et identifiants de messages uniquement).
+- Le contenu des mails est renvoyé à l'IA **marqué comme non fiable** (protection contre l'injection de prompt).
+- Envoi **désactivé par défaut** ; désabonnements limités aux liens https publics (protection SSRF) ; jamais de suppression définitive.
+- Journal local de toutes les actions (`audit_log`).
+- Conteneur non root, système de fichiers en lecture seule, aucune capacité Linux.
 
 Détails : [docs/CONFORMITE-RGPD.md](docs/CONFORMITE-RGPD.md) et [SECURITY.md](SECURITY.md).
+
+## Développement
+
+```bash
+npm ci
+npm run build
+npm test                                   # tests unitaires
+docker compose -f docker/compose.test.yml up -d
+npm run test:integration                   # parcours complet contre un vrai serveur IMAP/SMTP (GreenMail)
+```
 
 ## Documentation
 
 | Document | Contenu |
 |---|---|
-| [docs/PLAN.md](docs/PLAN.md) | Plan, phases, faisabilité, décisions à prendre |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Composants, diagramme de classes, scénarios (séquences), états |
+| [docs/PLAN.md](docs/PLAN.md) | Plan, phases, décisions |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Composants, diagrammes de classes, scénarios, états |
+| [docs/OUTILS-MCP.md](docs/OUTILS-MCP.md) | Catalogue des outils, prompts et skills |
 | [docs/FOURNISSEURS.md](docs/FOURNISSEURS.md) | Connexion à chaque fournisseur |
-| [docs/CLIENTS.md](docs/CLIENTS.md) | Installation dans Claude, ChatGPT, Perplexity ; marketplaces |
+| [docs/CLIENTS.md](docs/CLIENTS.md) | Installation par client IA, marketplaces |
 | [docs/CONFORMITE-RGPD.md](docs/CONFORMITE-RGPD.md) | RGPD, CNIL, stockage des identifiants |
-| [docs/OUTILS-MCP.md](docs/OUTILS-MCP.md) | Catalogue des outils, prompts et ressources MCP |
-| [docs/tutoriels/](docs/tutoriels/) | Tutoriels illustrés (captures générées dans Docker) |
+| [docs/tutoriels/](docs/tutoriels/) | Tutoriels illustrés (à venir) |
 
 ## Licence
 

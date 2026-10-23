@@ -9,7 +9,7 @@ Engagements : accusé de réception sous 72 h, évaluation sous 7 jours, correct
 ## Périmètre
 
 - Code de ce dépôt et images `ghcr.io/benmacha/omnimail-mcp`.
-- Instance hébergée `mcp.benmacha.tn` / `omnimail.benmacha.tn` (une fois en service).
+- Instance hébergée officielle (une fois en service).
 
 Hors périmètre : déni de service, ingénierie sociale, tests sur des boîtes mail qui ne vous appartiennent pas.
 

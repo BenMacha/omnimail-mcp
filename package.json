@@ -1,0 +1,57 @@
+{
+  "name": "omnimail-mcp",
+  "version": "0.1.0",
+  "description": "Serveur MCP multi-comptes mail (IMAP/SMTP) : recherche, tri, désabonnement, classement, nettoyage",
+  "main": "dist/cli.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/cli.js serve",
+    "test": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/BenMacha/omnimail-mcp.git"
+  },
+  "author": "D'Ali Ben Macha",
+  "license": "AGPL-3.0-only",
+  "bugs": {
+    "url": "https://github.com/BenMacha/omnimail-mcp/issues"
+  },
+  "homepage": "https://github.com/BenMacha/omnimail-mcp#readme",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "imapflow": "^2.9.1",
+    "mailparser": "^3.12.4",
+    "nodemailer": "^10.2.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/mailparser": "^3.9.0",
+    "@types/node": "^26.6.5",
+    "@types/nodemailer": "^8.0.2",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  },
+  "type": "module",
+  "bin": {
+    "omnimail": "dist/cli.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "mcp",
+    "email",
+    "imap",
+    "claude",
+    "chatgpt"
+  ]
+}

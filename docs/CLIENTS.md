@@ -10,11 +10,11 @@
 - [Perplexity](#perplexity)
 - [Marketplaces et annuaires](#marketplaces-et-annuaires)
 
-> **Statut** : procédures cibles. Elles seront testées, datées et illustrées de captures en phase 7 (`docs/tutoriels/`). Les menus des clients IA changent souvent : chaque tutoriel indique la date de la dernière vérification.
+> **Statut** : le mode local (Claude Code, Claude Desktop, clients stdio) et le mode HTTP avec jeton fonctionnent depuis la 0.1.0. La connexion OAuth pour Claude.ai et ChatGPT arrive en phase 5. Les tutoriels illustrés de captures viendront en phase 7 (`docs/tutoriels/`). Les menus des clients IA changent souvent : chaque tutoriel indique la date de la dernière vérification.
 
 ## Local ou distant ?
 
-| Client | Local (stdio, Docker sur votre machine) | Distant (`https://mcp.benmacha.tn/mcp`) |
+| Client | Local (stdio, Docker sur votre machine) | Distant (URL de votre instance) |
 |---|---|---|
 | Claude Code | ✔ | ✔ |
 | Claude Desktop | ✔ | ✔ (via connecteurs) |
@@ -33,8 +33,8 @@ claude mcp add omnimail -- docker run -i --rm -v omnimail-data:/data ghcr.io/ben
 **Distant :**
 
 ```bash
-claude mcp add --transport http omnimail https://mcp.benmacha.tn/mcp
-# puis /mcp dans Claude Code pour se connecter (OAuth)
+claude mcp add --transport http omnimail https://<votre-instance>/mcp
+# 0.1.0 : ajouter --header "Authorization: Bearer <jeton>" ; OAuth en phase 5
 ```
 
 **Via la marketplace de ce dépôt (plugin avec skills incluses) :**
@@ -63,7 +63,7 @@ claude mcp add --transport http omnimail https://mcp.benmacha.tn/mcp
 ## Claude.ai (web et mobile)
 
 1. Paramètres → **Connecteurs** → *Ajouter un connecteur personnalisé*.
-2. URL : `https://mcp.benmacha.tn/mcp`.
+2. URL : `https://<votre-instance>/mcp`.
 3. *Se connecter* → page omnimail (passkey / lien magique) → consentement.
 4. Dans une conversation, activer le connecteur depuis le menu des outils.
 
@@ -72,7 +72,7 @@ Sur les offres Team / Enterprise, c'est un administrateur qui ajoute le connecte
 ## ChatGPT
 
 1. Paramètres → **Applications et connecteurs** → *Avancé* → activer le **mode développeur** (offres payantes).
-2. *Créer* un connecteur : nom `omnimail`, URL `https://mcp.benmacha.tn/mcp`, authentification OAuth.
+2. *Créer* un connecteur : nom `omnimail`, URL `https://<votre-instance>/mcp`, authentification OAuth.
 3. Dans une conversation, choisir le connecteur dans le menu « + ».
 4. ChatGPT demande confirmation avant les actions d'écriture.
 
