@@ -4,6 +4,24 @@ Format : [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versionnement
 
 ## [Unreleased]
 
+### Added
+
+- 151 unit tests with an in-memory IMAP fake (plans, undo, exclusions, search, drafts, unsubscribe, SSRF guard, CLI arguments, MCP server surface), coverage thresholds enforced (≈95 % lines).
+- Biome lint and formatting, `npm run check`, `.editorconfig`, `.nvmrc`.
+- GitHub Actions: lint and types, unit tests on Node 20 / 22 / 24 with coverage summary, end-to-end tests, Docker smoke test and Trivy scan, CodeQL, dependency review, tag-based releases; Dependabot; issue and pull-request templates; CODEOWNERS; code of conduct.
+- Folder names in three languages (`language`: `en`, `fr`, `ar`); Arabic keywords for categorization and scam detection.
+- Logo, wordmark and README in English, French and Arabic.
+
+### Changed
+
+- Code, tool descriptions, errors, MCP prompts and Claude Code skills are now in English. Parameter values renamed: `thenMove` `none|archive|trash|folder`, `mode` `category|sender`, `action` `trash|archive`, categories `security|invoices|banking|administration|travel|orders|social|newsletters|notifications`; plan statuses `pending|applied|undone|expired`.
+- Default sorting root is `Sorted` (English), `Classement` (French) or `مرتب` (Arabic).
+
+### Fixed
+
+- Internationalized (punycode) sender domains were never flagged because the parser decodes them.
+- Non-breaking spaces from HTML mails are normalized in `mail_get`.
+
 ## [0.1.0] - 2026-10-23
 
 ### Added

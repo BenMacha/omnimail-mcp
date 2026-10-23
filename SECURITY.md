@@ -1,21 +1,22 @@
-# Politique de sécurité
+# Security policy
 
-## Signaler une vulnérabilité
+## Reporting a vulnerability
 
-Merci de **ne pas ouvrir d'issue publique**. Utilisez l'onglet *Security → Report a vulnerability* de ce dépôt GitHub (signalement privé).
+Please **do not open a public issue**. Use *Security → Report a vulnerability* on this repository (private report).
 
-Engagements : accusé de réception sous 72 h, évaluation sous 7 jours, correctif et publication coordonnée.
+We acknowledge within 72 hours, assess within 7 days, then fix and disclose in coordination with you.
 
-## Périmètre
+## Scope
 
-- Code de ce dépôt et images `ghcr.io/benmacha/omnimail-mcp`.
-- Instance hébergée officielle (une fois en service).
+- The code in this repository and the `ghcr.io/benmacha/omnimail-mcp` images.
+- The official hosted instance, once it exists.
 
-Hors périmètre : déni de service, ingénierie sociale, tests sur des boîtes mail qui ne vous appartiennent pas.
+Out of scope: denial of service, social engineering, tests on mailboxes you do not own.
 
-## Principes
+## Principles
 
-- Aucun secret en clair (code, logs, `.env`, sauvegardes).
-- Mots de passe d'application ou OAuth uniquement, jamais le mot de passe principal.
-- Actions sensibles derrière un plan et une confirmation ; défense contre l'injection de prompt (voir [docs/ARCHITECTURE.md §7](docs/ARCHITECTURE.md#7-sécurité-face-à-linjection-de-prompt)).
-- Images Docker minimales, utilisateur non root, système de fichiers en lecture seule quand c'est possible, scan Trivy et SBOM en CI.
+- No secret in clear text (code, logs, `.env`, backups); accounts live in an AES-256-GCM vault.
+- App passwords or OAuth only, never the account's main password.
+- Bulk and destructive actions require a plan and a confirmation token; e-mail content is passed to the AI as untrusted data (prompt-injection defence).
+- Unsubscribe requests only reach public https URLs (SSRF protection).
+- Minimal non-root Docker image, read-only filesystem, no Linux capabilities; Trivy scan, CodeQL and SBOM in CI.

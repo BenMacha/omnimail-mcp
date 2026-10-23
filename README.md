@@ -1,67 +1,75 @@
-# omnimail-mcp
+<p align="center">
+  <img src="assets/logo-wordmark.svg" alt="omnimail MCP" width="640">
+</p>
 
-> Un serveur **MCP** (Model Context Protocol) open source qui relie **toutes vos boîtes mail** — iCloud, Gmail, Yahoo, Infomaniak, Proton, et n'importe quel serveur IMAP — à votre assistant IA : **Claude Code, Claude Desktop, Claude.ai, ChatGPT, Perplexity**.
->
-> Chercher dans tous les comptes à la fois, repérer les envois récurrents et s'en désabonner, ranger en sous-dossiers (et tout déclasser), nettoyer, détecter les arnaques, préparer des réponses — en gardant le contrôle de vos données (RGPD).
+<p align="center">
+  <b>English</b> · <a href="README.fr.md">Français</a> · <a href="README.ar.md">العربية</a>
+</p>
 
-**Statut : 0.1.0, version locale fonctionnelle.** Voir [docs/PLAN.md](docs/PLAN.md) pour la suite (Outlook, OAuth, archivage planifié…).
+<p align="center">
+  <a href="https://github.com/BenMacha/omnimail-mcp/actions/workflows/ci.yml"><img src="https://github.com/BenMacha/omnimail-mcp/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/BenMacha/omnimail-mcp/actions/workflows/codeql.yml"><img src="https://github.com/BenMacha/omnimail-mcp/actions/workflows/codeql.yml/badge.svg" alt="CodeQL"></a>
+  <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="License AGPL-3.0">
+  <img src="https://img.shields.io/badge/node-%E2%89%A520-339933" alt="Node ≥ 20">
+  <img src="https://img.shields.io/badge/MCP-stdio%20%7C%20HTTP-4338CA" alt="MCP stdio | HTTP">
+</p>
 
----
+**omnimail** is an open-source **MCP** (Model Context Protocol) server that connects **all your mailboxes** — iCloud, Gmail, Yahoo, Infomaniak, Proton and any IMAP server — to your AI assistant: **Claude Code, Claude Desktop, Claude.ai, ChatGPT, Perplexity**.
 
-## Sommaire
+Search every account at once, spot recurring senders and unsubscribe, sort into sub-folders (and undo it), clean up, detect scams, draft replies — while keeping control of your data.
 
-- [Ce que l'outil fait](#ce-que-loutil-fait)
-- [Installation](#installation)
-- [Ajouter vos comptes](#ajouter-vos-comptes)
-- [Exemples de demandes](#exemples-de-demandes)
-- [Fournisseurs pris en charge](#fournisseurs-pris-en-charge)
-- [Sécurité et vie privée](#sécurité-et-vie-privée)
-- [Développement](#développement)
-- [Documentation](#documentation)
-- [Licence](#licence)
+> **Status: 0.1.0 — working local version.** Outlook / OAuth, hosted mode and scheduled archiving are on the [roadmap](docs/PLAN.md).
 
----
+## Contents
 
-## Ce que l'outil fait
+- [Features](#features)
+- [Install](#install)
+- [Add your accounts](#add-your-accounts)
+- [Example requests](#example-requests)
+- [Providers](#providers)
+- [Settings](#settings)
+- [Security and privacy](#security-and-privacy)
+- [Development](#development)
+- [License](#license)
 
-| Domaine | Outils MCP |
+## Features
+
+| Area | MCP tools |
 |---|---|
-| Comptes | `accounts_list`, `account_status` (connexion OK ou cause de l'échec) |
-| Lecture | `mail_search` (tous les comptes en parallèle), `mail_get`, `attachment_get`, `folders_list` |
-| Envois récurrents | `recurring_senders_list` : volume, fréquence, taux de lecture, méthode de désabonnement |
-| Désabonnement | `unsubscribe_plan` : désabonnement one-click (RFC 8058) ou par mail, et rangement des anciens mails |
-| Classement | `classify_plan` : sous-dossiers par catégorie (Factures, Banque, Commandes, Voyages, Newsletters…), par expéditeur ou par règles |
-| Nettoyage | `cleanup_plan` : archive ou corbeille selon catégorie, expéditeur, ancienneté, taille |
-| Plans | `plan_apply` (après accord), `plan_undo` (**déclasser** / annuler), `plans_list` |
-| Organisation | `mail_move`, `mail_mark` (lu, important) |
-| Spam & arnaques | `spam_check` : SPF / DKIM / DMARC, usurpation, liens trompeurs, pièces jointes dangereuses, faux changement de RIB |
-| Réponses | `draft_create`, `draft_reply`, `mail_send` (désactivé par défaut) |
-| Suivi | `audit_log`, `settings_get` |
+| Accounts | `accounts_list`, `account_status` (connection OK, or why it failed) |
+| Reading | `mail_search` (all accounts in parallel), `mail_get`, `attachment_get`, `folders_list` |
+| Recurring senders | `recurring_senders_list`: volume, frequency, read rate, unsubscribe method |
+| Unsubscribe | `unsubscribe_plan`: RFC 8058 one-click or mailto unsubscribe, and filing of past messages |
+| Sorting | `classify_plan`: sub-folders by category (invoices, banking, orders, travel, newsletters…), by sender or by custom rules |
+| Cleanup | `cleanup_plan`: archive or trash by category, sender, age, size |
+| Plans | `plan_apply` (after approval), `plan_undo` (revert / unsort), `plans_list` |
+| Organizing | `mail_move`, `mail_mark` (read, flagged) |
+| Spam & scams | `spam_check`: SPF / DKIM / DMARC, spoofing, deceptive links, dangerous attachments, fake bank-detail changes |
+| Replies | `draft_create`, `draft_reply`, `mail_send` (off by default) |
+| Tracking | `audit_log`, `settings_get` |
 
-**Toute modification en masse passe par un plan** : l'outil montre ce qu'il va faire, l'utilisateur valide, puis `plan_apply` exécute. Chaque plan est **annulable** pendant 30 jours avec `plan_undo` (sauf les désabonnements, par nature).
+**Every bulk change goes through a plan**: omnimail shows what it is about to do, you approve, then `plan_apply` runs it. Every plan can be **undone** for 30 days with `plan_undo` (except unsubscribes, by nature).
 
-Prompts MCP et skills inclus : `tri-du-matin`, `menage-newsletters`, `classement-dossiers`, `grand-nettoyage`, `detecteur-arnaques`, `reponses-en-attente`.
+Bundled MCP prompts and Claude Code skills: `morning-triage`, `newsletter-cleanup`, `sort-into-folders`, `deep-cleanup`, `scam-detector`, `pending-replies`.
 
-## Installation
+## Install
 
-Prérequis : Docker.
+Requirement: Docker.
 
-### Claude Code — via la marketplace de ce dépôt (recommandé)
+**Claude Code — from this repository's marketplace (recommended)**
 
 ```text
 /plugin marketplace add BenMacha/omnimail-mcp
 /plugin install omnimail@omnimail
 ```
 
-Le plugin installe le serveur MCP et les skills.
-
-### Claude Code — commande directe
+**Claude Code — direct command**
 
 ```bash
 claude mcp add omnimail -- docker run -i --rm -v omnimail-data:/data ghcr.io/benmacha/omnimail-mcp:latest
 ```
 
-### Claude Desktop, Perplexity (Mac), autres clients stdio
+**Claude Desktop, Perplexity (Mac) and other stdio clients**
 
 ```json
 {
@@ -74,84 +82,90 @@ claude mcp add omnimail -- docker run -i --rm -v omnimail-data:/data ghcr.io/ben
 }
 ```
 
-### Claude.ai, ChatGPT et clients qui demandent une URL
+**Clients that need a URL (Claude.ai, ChatGPT)**
 
 ```bash
 OMNIMAIL_HTTP_TOKEN=$(openssl rand -hex 24) docker compose --profile http up -d
-# → http://127.0.0.1:3333/mcp, en-tête Authorization: Bearer <jeton>
+# → http://127.0.0.1:3333/mcp with header Authorization: Bearer <token>
 ```
 
-L'exposition publique (HTTPS, connexion OAuth pour Claude.ai / ChatGPT) est prévue en phase 5 ; d'ici là, ce mode est destiné à un usage local ou derrière votre propre proxy HTTPS.
+Public HTTPS exposure with OAuth sign-in for Claude.ai and ChatGPT comes in phase 5; until then this mode is for local use or behind your own HTTPS proxy. Per-client details (in French): [docs/CLIENTS.md](docs/CLIENTS.md).
 
-Détails par client : [docs/CLIENTS.md](docs/CLIENTS.md).
-
-## Ajouter vos comptes
+## Add your accounts
 
 ```bash
 docker run -it --rm -v omnimail-data:/data ghcr.io/benmacha/omnimail-mcp:latest accounts add
 docker run -it --rm -v omnimail-data:/data ghcr.io/benmacha/omnimail-mcp:latest accounts test
 ```
 
-L'assistant détecte le fournisseur depuis l'adresse, indique où créer le **mot de passe d'application**, masque la saisie et teste la connexion avant d'enregistrer. Autres commandes : `accounts list`, `accounts remove <id>`, `providers`, `settings get|set`.
+The wizard detects the provider from the address, tells you where to create an **app password**, hides what you type and tests the connection before saving. Other commands: `accounts list`, `accounts remove <id>`, `providers`, `settings get|set`.
 
-Pour mettre la clé de chiffrement hors du volume de données (recommandé) : `docker compose` avec le secret `omnimail_master_key`, ou la variable `OMNIMAIL_MASTER_KEY_FILE`.
+To keep the encryption key out of the data volume (recommended), use the `omnimail_master_key` Docker secret from `docker-compose.yml`, or `OMNIMAIL_MASTER_KEY_FILE`.
 
-## Exemples de demandes
+## Example requests
 
-- « Quels sont les expéditeurs qui m'écrivent le plus et que je ne lis jamais ? Désabonne-moi des cinq premiers et range leurs anciens mails dans un dossier. »
-- « Classe ma boîte de réception iCloud en sous-dossiers par catégorie. » … puis « Finalement, déclasse tout. »
-- « Archive les notifications et les réseaux sociaux lus de plus de six mois, sur tous mes comptes. »
-- « Ce mail de "PayPal" est-il une arnaque ? »
-- « Retrouve la facture EDF de septembre et prépare une réponse au service client. »
+- "Which senders write to me the most and I never read? Unsubscribe me from the top five and file their past messages in a folder."
+- "Sort my iCloud inbox into sub-folders by category." … then "Actually, undo it."
+- "Archive notifications and social-network messages I read more than six months ago, in all my accounts."
+- "Is this 'PayPal' e-mail a scam?"
+- "Find the September electricity invoice and draft a reply to customer service."
 
-## Fournisseurs pris en charge
+## Providers
 
-| Fournisseur | Connexion | État |
+| Provider | Sign-in | Status |
 |---|---|---|
-| iCloud Mail | mot de passe d'application | ✅ |
-| Gmail / Google Workspace | mot de passe d'application (OAuth en phase 4) | ✅ |
-| Yahoo, AOL | mot de passe d'application | ✅ |
-| Infomaniak | mot de passe (d'application si 2FA) | ✅ |
-| Proton Mail | Proton Mail Bridge (profil Docker `proton`) | ✅ |
-| Fastmail, Zoho, GMX, OVHcloud, IMAP générique | IMAP/SMTP | ✅ |
-| Outlook.com / Microsoft 365 | OAuth obligatoire chez Microsoft | phase 4 |
+| iCloud Mail | app password | ✅ |
+| Gmail / Google Workspace | app password (OAuth in phase 4) | ✅ |
+| Yahoo, AOL | app password | ✅ |
+| Infomaniak | password (app password with 2FA) | ✅ |
+| Proton Mail | Proton Mail Bridge (Docker profile `proton`) | ✅ |
+| Fastmail, Zoho, GMX, OVHcloud, any IMAP | IMAP/SMTP | ✅ |
+| Outlook.com / Microsoft 365 | OAuth required by Microsoft | phase 4 |
 
-Détails : [docs/FOURNISSEURS.md](docs/FOURNISSEURS.md).
+## Settings
 
-## Sécurité et vie privée
+`omnimail settings set <key> <value>`
 
-- **Jamais votre mot de passe principal** : uniquement des mots de passe d'application, révocables chez le fournisseur.
-- Comptes stockés dans un **coffre chiffré** (AES-256-GCM, clé dérivée par scrypt) ; aucun secret dans un fichier `.env`, un journal ou une réponse d'outil.
-- **Aucune copie des mails** : lecture à la demande, rien n'est stocké hors des plans (références et identifiants de messages uniquement).
-- Le contenu des mails est renvoyé à l'IA **marqué comme non fiable** (protection contre l'injection de prompt).
-- Envoi **désactivé par défaut** ; désabonnements limités aux liens https publics (protection SSRF) ; jamais de suppression définitive.
-- Journal local de toutes les actions (`audit_log`).
-- Conteneur non root, système de fichiers en lecture seule, aucune capacité Linux.
+| Key | Default | Purpose |
+|---|---|---|
+| `sendEnabled` | `false` | Allow `mail_send` (also `OMNIMAIL_SEND_ENABLED=true`) |
+| `language` | `en` | Language of the folders omnimail creates: `en`, `fr`, `ar` (e.g. `Sorted/Invoices`, `Classement/Factures`, `مرتب/الفواتير`) |
+| `classifyRoot` | *(localized)* | Root folder for sorting |
+| `maxActionsPerPlan` | `5000` | Maximum messages per plan |
+| `planTtlMinutes` | `15` | How long a plan waits for approval |
+| `searchLimitPerAccount` | `50` | Results per account and folder |
 
-Détails : [docs/CONFORMITE-RGPD.md](docs/CONFORMITE-RGPD.md) et [SECURITY.md](SECURITY.md).
+## Security and privacy
 
-## Développement
+- **Never your main password**: app passwords only, revocable at the provider.
+- Accounts are stored in an **encrypted vault** (AES-256-GCM, scrypt-derived key); no secret in `.env` files, logs or tool output.
+- **No copy of your mail**: messages are read on demand; plans only keep references and Message-IDs.
+- E-mail content is returned to the AI **marked as untrusted** (prompt-injection defence).
+- Sending **off by default**; unsubscribe calls limited to public https links (SSRF protection); never permanent deletion.
+- Local log of every action (`audit_log`); non-root container, read-only filesystem, no Linux capabilities.
+
+GDPR / CNIL framework (in French): [docs/CONFORMITE-RGPD.md](docs/CONFORMITE-RGPD.md) · Security policy: [SECURITY.md](SECURITY.md).
+
+## Development
 
 ```bash
 npm ci
-npm run build
-npm test                                   # tests unitaires
+npm run check                               # lint (Biome) + types + unit tests with coverage
 docker compose -f docker/compose.test.yml up -d
-npm run test:integration                   # parcours complet contre un vrai serveur IMAP/SMTP (GreenMail)
+npm run test:integration                    # full journey against a real IMAP/SMTP server (GreenMail)
 ```
 
-## Documentation
+CI on GitHub Actions: lint, unit tests on Node 20 / 22 / 24 with coverage, end-to-end tests, Docker smoke test and Trivy scan, CodeQL, dependency review, image publishing to GHCR and releases from tags. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-| Document | Contenu |
-|---|---|
-| [docs/PLAN.md](docs/PLAN.md) | Plan, phases, décisions |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Composants, diagrammes de classes, scénarios, états |
-| [docs/OUTILS-MCP.md](docs/OUTILS-MCP.md) | Catalogue des outils, prompts et skills |
-| [docs/FOURNISSEURS.md](docs/FOURNISSEURS.md) | Connexion à chaque fournisseur |
-| [docs/CLIENTS.md](docs/CLIENTS.md) | Installation par client IA, marketplaces |
-| [docs/CONFORMITE-RGPD.md](docs/CONFORMITE-RGPD.md) | RGPD, CNIL, stockage des identifiants |
-| [docs/tutoriels/](docs/tutoriels/) | Tutoriels illustrés (à venir) |
+Design documents (in French): [plan](docs/PLAN.md) · [architecture](docs/ARCHITECTURE.md) · [tools](docs/OUTILS-MCP.md) · [providers](docs/FOURNISSEURS.md).
 
-## Licence
+## License
 
-[AGPL-3.0](LICENSE) — libre d'utiliser, modifier et auto-héberger ; toute version modifiée proposée en service en ligne doit publier son code source.
+[AGPL-3.0](LICENSE) — free to use, modify and self-host; a modified version offered as an online service must publish its source code.
+
+---
+
+<p align="center">
+  <img src="assets/palestine-flag.svg" alt="Flag of Palestine" width="72"><br>
+  <b>Free Palestine</b> 🇵🇸
+</p>

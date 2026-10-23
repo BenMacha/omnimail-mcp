@@ -82,7 +82,7 @@ README, plan, architecture, diagrammes, cadre RGPD. **Livré.**
 - Journal d'audit local.
 
 ### Phase 3 — Envois récurrents, désabonnement, classement, nettoyage, spam, skills ✅ 0.1.0
-- `cleanup_plan` / `cleanup_apply` (simulation → validation → exécution, annulable : déplacement en corbeille, jamais suppression définitive par défaut).
+- `cleanup_plan` / `plan_apply` (simulation → validation → exécution, annulable : déplacement en corbeille, jamais suppression définitive par défaut).
 - `recurring_senders_list` : détection des envois récurrents (List-Id, expéditeur), fréquence, taux de lecture.
 - `unsubscribe_plan` : désabonnement one-click (RFC 8058) ou mailto, liens web restitués à l'utilisateur, rangement des anciens mails.
 - `classify_plan` : classement en sous-dossiers par catégorie, par expéditeur ou par règles ; `plan_undo` pour déclasser.

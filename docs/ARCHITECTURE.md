@@ -18,7 +18,7 @@
 - [5. États d'une connexion de compte](#5-états-dune-connexion-de-compte)
 - [6. Modèle de données (hébergé)](#6-modèle-de-données-hébergé)
 - [7. Sécurité face à l'injection de prompt](#7-sécurité-face-à-linjection-de-prompt)
-- [8. Arborescence cible du code](#8-arborescence-cible-du-code)
+- [8. Arborescence du code](#8-arborescence-du-code)
 
 ---
 
@@ -458,7 +458,7 @@ sequenceDiagram
   MCP-->>IA: 37 expéditeurs récurrents (one-click, mailto, lien)
   IA-->>U: tableau + recommandations
   U->>IA: « Les 5 premiers, et range leurs anciens mails »
-  IA->>MCP: unsubscribe_plan {senders:[…], thenMove:"dossier"}
+  IA->>MCP: unsubscribe_plan {senders:[…], thenMove:"folder"}
   MCP-->>IA: plan n°7 + jeton (rien n'est fait)
   IA-->>U: plan détaillé — je valide ?
   U->>IA: Oui
@@ -480,7 +480,7 @@ sequenceDiagram
   participant P as Serveur IMAP
 
   U->>IA: « Range ma boîte iCloud par catégorie »
-  IA->>MCP: classify_plan {accounts:["moi-icloud-com"], mode:"categorie"}
+  IA->>MCP: classify_plan {accounts:["moi-icloud-com"], mode:"category"}
   MCP->>P: FETCH enveloppes + en-têtes
   MCP->>MCP: catégorisation (Factures, Banque, Commandes…)
   MCP->>PS: plan (références + Message-ID, pas de contenu)
@@ -558,7 +558,7 @@ Un mail est une donnée **écrite par un tiers**. Il peut contenir « Ignore tes
 
 1. Tout contenu de mail renvoyé par un outil est encadré et étiqueté comme **non fiable** (`untrusted: true`, délimiteurs explicites).
 2. Les outils d'écriture portent les annotations MCP `destructiveHint` / `openWorldHint` ; les clients demandent alors confirmation.
-3. `mail_send`, `cleanup_apply`, suppression, transfert : **jeton de confirmation** issu d'un plan préalable, à usage unique, expirant.
+3. `mail_send`, `plan_apply`, suppression, transfert : **jeton de confirmation** issu d'un plan préalable, à usage unique, expirant.
 4. Transfert automatique vers une adresse externe, création de règles de redirection : **interdits** par défaut.
 5. Liens et pièces jointes : jamais ouverts automatiquement ; `phishing_check` les analyse sans les exécuter.
 6. Limites de débit et plafonds (ex. 50 envois/jour, 5 000 déplacements/plan) configurables.
@@ -570,7 +570,10 @@ Un mail est une donnée **écrite par un tiers**. Il peut contenir « Ignore tes
 omnimail-mcp/
 ├── src/
 │   ├── cli.ts            # commandes : serve (stdio / HTTP), accounts, providers, settings
-│   ├── server.ts         # outils, prompts MCP, garde-fous (contenu non fiable)
+│   ├── server.ts         # outils MCP, garde-fous (contenu non fiable)
+│   ├── prompts.ts        # prompts MCP
+│   ├── i18n.ts           # noms des dossiers créés (en, fr, ar)
+│   ├── args.ts           # arguments de la CLI
 │   ├── accounts.ts       # comptes (dans le coffre)
 │   ├── vault.ts          # coffre chiffré AES-256-GCM + scrypt
 │   ├── presets.ts        # iCloud, Gmail, Yahoo, Infomaniak, Proton Bridge…
@@ -583,7 +586,9 @@ omnimail-mcp/
 ├── .claude-plugin/       # marketplace.json
 ├── server.json           # fiche pour le registre MCP officiel
 ├── Dockerfile, docker-compose.yml, docker/compose.test.yml
-├── tests/unit, tests/integration (GreenMail)
+├── tests/unit (faux serveur IMAP en mémoire), tests/integration (GreenMail)
+├── assets/               # logo, drapeau
+├── .github/              # CI, CodeQL, Dependabot, modèles d'issues et de PR
 └── docs/
 ```
 
