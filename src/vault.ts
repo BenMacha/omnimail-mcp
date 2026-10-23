@@ -26,12 +26,15 @@ function readKeyMaterial(): string {
     if (file && existsSync(file)) return readFileSync(file, "utf8").trim();
   }
   const local = dataPath("master.key");
-  if (!existsSync(local)) {
-    writeFileSync(local, randomBytes(32).toString("base64"), { mode: 0o600 });
+  try {
+    // "wx": create only if absent, atomically (no check-then-write race).
+    writeFileSync(local, randomBytes(32).toString("base64"), { mode: 0o600, flag: "wx" });
     process.stderr.write(
       `[omnimail] Master key generated in ${local}. For better security, move it out of the data volume ` +
         `(OMNIMAIL_MASTER_KEY_FILE or a Docker secret).\n`,
     );
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
   }
   return readFileSync(local, "utf8").trim();
 }

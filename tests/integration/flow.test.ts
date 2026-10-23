@@ -12,6 +12,7 @@ import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { ImapFlow } from "imapflow";
+import { Agent, setGlobalDispatcher } from "undici";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const HOST = process.env.GREENMAIL_HOST ?? "127.0.0.1";
@@ -22,7 +23,6 @@ const work = mkdtempSync(join(tmpdir(), "omnimail-it-"));
 process.env.OMNIMAIL_DATA_DIR = work;
 process.env.OMNIMAIL_MASTER_KEY = "test-master-key-not-for-production";
 process.env.OMNIMAIL_ALLOW_PRIVATE_URLS = "true";
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
 const { AccountStore } = await import("../../src/accounts.js");
 const { createServer: createMcp } = await import("../../src/server.js");
@@ -93,9 +93,13 @@ beforeAll(async () => {
       "1",
       "-subj",
       "/CN=localhost",
+      "-addext",
+      "subjectAltName=DNS:localhost",
     ],
     { stdio: "ignore" },
   );
+  // Trust only the test certificate (no certificate validation is disabled).
+  setGlobalDispatcher(new Agent({ connect: { ca: readFileSync(join(work, "c.pem")) } }));
   https = createServer({ key: readFileSync(join(work, "k.pem")), cert: readFileSync(join(work, "c.pem")) }, (req, res) => {
     let body = "";
     req.on("data", (c) => (body += c));

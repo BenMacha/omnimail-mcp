@@ -21,6 +21,7 @@ Format : [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versionnement
 
 - Internationalized (punycode) sender domains were never flagged because the parser decodes them.
 - Non-breaking spaces from HTML mails are normalized in `mail_get`.
+- CodeQL findings: complete tag stripping and entity decoding order (no double unescaping), anchored MIME check in `attachment_get`, atomic creation of `master.key`, end-to-end tests trust the test certificate instead of disabling TLS validation.
 
 ## [0.1.0] - 2026-10-23
 

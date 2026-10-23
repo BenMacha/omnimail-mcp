@@ -23,6 +23,7 @@ import {
 } from "./services/read.js";
 import { groupKey, type RecurringScan, scanRecurring } from "./services/recurring.js";
 import { scoreMessage } from "./services/spam.js";
+import { isTextMime } from "./text.js";
 
 export const VERSION = "0.1.0";
 
@@ -216,7 +217,7 @@ export function createServer(deps: ServerDeps = { accounts: new AccountStore(), 
         const r = decodeRef(ref);
         const att = await getAttachment(accounts.get(r.accountId), r, index);
         if (att.size > 5 * 1024 * 1024) throw new Error(`Attachment too large (${Math.round(att.size / 1024 / 1024)} MB).`);
-        if (/^text\/|json|xml|csv/.test(att.contentType)) {
+        if (isTextMime(att.contentType)) {
           return untrusted({ filename: att.filename, contentType: att.contentType, text: att.content.toString("utf8") });
         }
         return {

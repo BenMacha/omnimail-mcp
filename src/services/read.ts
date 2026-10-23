@@ -4,6 +4,7 @@ import type { Account } from "../accounts.js";
 import { extractAddress, header, parseHeaders, parseListUnsubscribe, type UnsubscribeInfo } from "../headers.js";
 import { errorMessage, findSpecialUse, inMailbox, isGmail, withImap } from "../imap.js";
 import { encodeRef, type MessageRef } from "../refs.js";
+import { htmlToText } from "../text.js";
 
 /** Headers fetched for each message summary. */
 export const SUMMARY_HEADERS = [
@@ -195,20 +196,6 @@ export interface FullMessage {
   text: string;
   truncated: boolean;
   attachments: { index: number; filename?: string; contentType: string; size: number }[];
-}
-
-function htmlToText(html: string): string {
-  return html
-    .replace(/<(script|style)[\s\S]*?<\/\1>/gi, "")
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/(p|div|tr|li|h\d)>/gi, "\n")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
 }
 
 export async function fetchSource(account: Account, ref: MessageRef): Promise<Buffer> {

@@ -1,5 +1,6 @@
 import type { ParsedMail } from "mailparser";
 import { baseDomain, domainOf, extractAddress } from "../headers.js";
+import { stripTags } from "../text.js";
 
 export interface SpamReport {
   score: number;
@@ -95,8 +96,7 @@ export function scoreMessage(parsed: ParsedMail): SpamReport {
     try {
       const target = new URL(href);
       if (/^\d+\.\d+\.\d+\.\d+$/.test(target.hostname)) ipLinks++;
-      const shown = inner
-        .replace(/<[^>]+>/g, "")
+      const shown = stripTags(inner)
         .trim()
         .match(/(?:https?:\/\/)?([a-z0-9-]+(?:\.[a-z0-9-]+)+)/i)?.[1];
       if (shown && baseDomain(shown.toLowerCase()) !== baseDomain(target.hostname.toLowerCase())) mismatched++;
